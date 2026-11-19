@@ -1,9 +1,14 @@
 {
   "domain": "grill",
   "name": "Grill",
-  "codeowners": ["@GizmoGoody"],
+  "after_dependencies": [
+    "frontend",
+    "http"
+  ],
+  "codeowners": [
+    "@GizmoGoody"
+  ],
   "config_flow": true,
-  "dependencies": ["frontend", "http"],
   "documentation": "https://github.com/GizmoGoody/grill-card",
   "integration_type": "service",
   "iot_class": "calculated",

@@ -13,8 +13,6 @@ import hashlib
 import logging
 from pathlib import Path
 
-from homeassistant.components.frontend import add_extra_js_url
-from homeassistant.components.http import StaticPathConfig
 from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
@@ -24,8 +22,13 @@ CARD_FILE = Path(__file__).parent / "www" / "grill-card.js"
 
 
 async def async_register_card(hass: HomeAssistant) -> None:
-    if hass.http is None:
-        return  # No web server, as in tests
+    if "frontend" not in hass.config.components or hass.http is None:
+        return  # No dashboards to serve, as in tests
+
+    # Imported here: the frontend is optional (after_dependencies)
+    from homeassistant.components.frontend import add_extra_js_url  # noqa: PLC0415
+    from homeassistant.components.http import StaticPathConfig  # noqa: PLC0415
+
     try:
         content = await hass.async_add_executor_job(CARD_FILE.read_bytes)
     except OSError:
