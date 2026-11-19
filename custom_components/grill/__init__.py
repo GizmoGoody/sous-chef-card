@@ -49,6 +49,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: GrillConfigEntry) -> boo
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: GrillConfigEntry) -> bool:
+    for store in {probe.store for probe in entry.runtime_data.values()}:
+        await store.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 

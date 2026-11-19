@@ -43,6 +43,10 @@ class CookStore:
         self.data[probe_id] = cook
         self._store.async_delay_save(lambda: self.data, 2)
 
+    async def async_flush(self) -> None:
+        """Save now: a reload reads the store again at once."""
+        await self._store.async_save(self.data)
+
     @callback
     def forget(self, keep: set[str]) -> None:
         """Drop the cooks of probes that were removed."""
@@ -84,7 +88,7 @@ class Probe:
     def __init__(self, hass: HomeAssistant, store: CookStore, probe_id: str, data: dict[str, Any]) -> None:
         self.hass = hass
         self.id = probe_id
-        self._store = store
+        self.store = store
         self.reading_entity: str = data["reading"]
         self.colors: list[str] = list(data.get("colors") or [])
         self.tip_channel: int = int(data.get("tip_channel", 1))
@@ -259,7 +263,7 @@ class Probe:
         self._changed()
 
     def _save(self) -> None:
-        self._store.save(self.id, {
+        self.store.save(self.id, {
             "cook_type": self.cook_type, "doneness": self.doneness, "target": self.target, "start": self.start,
         })
 

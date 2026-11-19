@@ -2,6 +2,7 @@
 
 from homeassistant.config_entries import ConfigSubentryData
 from homeassistant.core import HomeAssistant
+from homeassistant.util.unit_system import US_CUSTOMARY_SYSTEM
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.grill.const import DOMAIN
@@ -10,6 +11,7 @@ READING = "sensor.probe_reading"
 
 
 async def _setup(hass: HomeAssistant) -> MockConfigEntry:
+    hass.config.units = US_CUSTOMARY_SYSTEM
     hass.states.async_set(READING, "100", {"unit_of_measurement": "°F", "device_class": "temperature"})
     entry = MockConfigEntry(
         domain=DOMAIN,
