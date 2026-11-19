@@ -1,0 +1,78 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add a grill",
+        "description": "A grill holds your meat probes. After it is added, add each probe to it.",
+        "data": { "name": "Name" }
+      }
+    }
+  },
+  "config_subentries": {
+    "probe": {
+      "entry_type": "Probe",
+      "initiate_flow": { "user": "Add probe" },
+      "step": {
+        "user": {
+          "title": "Add a probe",
+          "description": "Choose the probe's reading. For a ThermoWorks RFX MEAT, that is its channel 0, the lowest of its four sensors.",
+          "data": { "reading": "Reading", "colors": "Probe colors", "tip_channel": "Sensor at the tip" },
+          "data_description": {
+            "reading": "The temperature sensor the probe's cook follows.",
+            "colors": "The colored bands on the probe, in order. The Grill card shows the probe in these colors.",
+            "tip_channel": "Which of the probe's four sensors is nearest its tip. The Grill card lists the sensors in order from the tip."
+          }
+        },
+        "reconfigure": {
+          "title": "Change the probe",
+          "data": { "colors": "Probe colors", "tip_channel": "Sensor at the tip" },
+          "data_description": {
+            "colors": "The colored bands on the probe, in order. The Grill card shows the probe in these colors.",
+            "tip_channel": "Which of the probe's four sensors is nearest its tip. The Grill card lists the sensors in order from the tip."
+          }
+        }
+      },
+      "error": { "already_added": "This sensor is already a probe of this grill." },
+      "abort": { "reconfigure_successful": "The probe was changed." }
+    }
+  },
+  "entity": {
+    "select": {
+      "cook_type": {
+        "name": "Cook type",
+        "state": {
+          "beef": "Beef", "ground_beef": "Ground beef", "pork": "Pork", "poultry": "Poultry", "seafood": "Seafood", "manual": "Manual"
+        }
+      },
+      "doneness": {
+        "name": "Doneness",
+        "state": {
+          "rare": "Rare", "medium_rare": "Medium rare", "medium": "Medium", "medium_well": "Medium well", "well_done": "Well done",
+          "done": "Done", "tuna": "Tuna", "salmon": "Salmon", "shrimp": "Shrimp", "scallops": "Scallops", "lobster": "Lobster",
+          "custom": "Custom"
+        }
+      }
+    },
+    "number": { "target": { "name": "Target" } },
+    "sensor": {
+      "progress": { "name": "Progress" },
+      "rate": { "name": "Rate" },
+      "done_at": { "name": "Done at" }
+    },
+    "binary_sensor": {
+      "done": { "name": "Done" },
+      "stalled": { "name": "Stalled" }
+    }
+  },
+  "selector": {
+    "color": {
+      "options": {
+        "red": "Red", "pink": "Pink", "purple": "Purple", "deep-purple": "Deep purple", "indigo": "Indigo", "blue": "Blue",
+        "light-blue": "Light blue", "cyan": "Cyan", "teal": "Teal", "green": "Green", "light-green": "Light green", "lime": "Lime",
+        "yellow": "Yellow", "amber": "Amber", "orange": "Orange", "deep-orange": "Deep orange", "brown": "Brown", "grey": "Grey",
+        "black": "Black", "white": "White"
+      }
+    },
+    "tip_channel": { "options": { "1": "Channel 1", "4": "Channel 4" } }
+  }
+}
