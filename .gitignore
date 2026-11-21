@@ -1,10 +1,9 @@
 # Session notes that do not belong on GitHub
 ClaudeCodeNextSession.md
+# Build output and dependencies
+node_modules/
+dist/
 # Editor and OS files
 .vscode/
 .DS_Store
 Thumbs.db
-# Python
-__pycache__/
-*.pyc
-.pytest_cache/

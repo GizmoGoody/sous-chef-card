@@ -1,45 +1,21 @@
-name: Validate
+# The Marketplace's own checks of the repository (hacs/action). They read
+# the card from the latest stable release (pre-releases do not count) or
+# else from the branch, which has no built card, so they run when a stable
+# release is published, or by hand.
+name: Marketplace validation
 
 on:
-  push:
-  pull_request:
-  schedule:
-    - cron: "0 6 * * *"
+  release:
+    types: [released]
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
-  hassfest:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: home-assistant/actions/hassfest@master
-
-  hacs:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: hacs/action@main
         with:
-          category: integration
-          # A new integration has no brand images in home-assistant/brands yet
-          ignore: brands
-
-  tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-      - run: pip install -r requirements_test.txt
-      - run: python -m pytest tests -v
-
-  card:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - run: node --check custom_components/grill/www/grill-card.js
+          category: plugin

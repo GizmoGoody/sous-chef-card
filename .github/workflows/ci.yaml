@@ -1,0 +1,43 @@
+# Checks every push and pull request: typecheck, lint, unit tests and the
+# build. The release workflow runs it too, before it publishes.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      # package.json pins every direct dependency to an exact version
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sous-chef-card
+          path: dist/sous-chef-card.js
