@@ -1,6 +1,6 @@
 {
-  "name": "Grill",
-  "render_readme": true,
+  "name": "Sous Chef Card",
+  "filename": "sous-chef-card.js",
   "hide_default_branch": true,
   "homeassistant": "2025.10.0"
 }
