@@ -26,7 +26,9 @@ export interface HomeAssistant {
   states: Record<string, HassEntity>;
   entities?: Record<string, EntityEntry>;
   devices?: Record<string, DeviceEntry>;
-  callService(domain: string, service: string, data?: Record<string, unknown>): unknown;
+  callService(domain: string, service: string, data?: Record<string, unknown>): Promise<unknown>;
+  callWS<T>(message: Record<string, unknown>): Promise<T>;
+  loadBackendTranslation(category: string, integration?: string): Promise<(key: string) => string>;
   formatEntityState(stateObj: HassEntity, state?: string): string;
   formatEntityName?(stateObj: HassEntity, name: unknown): string;
   [key: string]: unknown;

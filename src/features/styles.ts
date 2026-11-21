@@ -149,8 +149,12 @@ export const featureStyles = css`
     align-items: center;
     gap: 4px;
   }
-  .source a:hover {
+  .source a:hover,
+  .source .chart:hover {
     text-decoration: underline;
+  }
+  .source .chart {
+    color: var(--primary-color);
   }
   .source ha-icon {
     --mdc-icon-size: 14px;

@@ -1,7 +1,7 @@
 // Sous Chef Card: Home Assistant's tile card for the Sous Chef integration
 // (domain sous_chef), with its features:
 // - custom:sous-chef-progress  a probe's ring, Internal → Target, Done at and Rate
-// - custom:sous-chef-preset    Food type, Doneness, Target, and the source with its chart link
+// - custom:sous-chef-preset    Food type, Doneness, Target, and the source: it opens the chart view
 // - custom:sous-chef-channels  ch 1 to ch n, with Max outlined
 // - custom:sous-chef-ambient   the ambient sensors and their alarms
 // - custom:sous-chef-probes    an Active switch per probe, and a ring and a row for each probe that is on
@@ -10,6 +10,7 @@ import { printBadge } from "@gizmogoody/card-badge";
 import { CARD_TYPE, EDITOR_TYPE, VERSION } from "./const";
 import { define, type FeatureContext, type HomeAssistant } from "./ha";
 import { SousChefCard } from "./card";
+import { CHART_DIALOG, SousChefChartDialog } from "./chart/dialog";
 import { SousChefCardEditor } from "./editor";
 import { SousChefAmbient, SousChefProbes } from "./features/grill";
 import { SousChefChannels, SousChefPreset, SousChefProgress } from "./features/probe";
@@ -29,6 +30,7 @@ if (!customElements.get(CARD_TYPE)) {
   for (const feature of [...PROBE, ...GRILL]) define(feature.tag, feature);
   define(CARD_TYPE, SousChefCard);
   define(EDITOR_TYPE, SousChefCardEditor);
+  define(CHART_DIALOG, SousChefChartDialog);
 
   window.customCardFeatures = window.customCardFeatures || [];
   window.customCardFeatures.push(...[...PROBE, ...GRILL].map((feature) => ({

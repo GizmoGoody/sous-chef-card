@@ -31,7 +31,7 @@ A new card is a grill view when Sous Chef has an ambient sensor, and otherwise a
 ### Features
 
 - **Sous Chef progress**: a ring in the probe's colors (striped for several), Internal → Target, Done at, and Rate. Done, Stalled, Alarm or No reading shows in place of Done at.
-- **Sous Chef preset**: Food type and Doneness, Target, and the source with a link to its chart.
+- **Sous Chef preset**: Food type and Doneness, Target, and the source. Tap the source to open its whole chart: every food, doneness and temperature, with any rest or hold time. Switch to another source there, and choose a row to set the probe's Source, Food type and Doneness. The icon beside the source opens the published chart.
 - **Sous Chef channels**: ch 1 to ch n from the tip, with the current Max outlined.
 - **Sous Chef ambient**: the other ambient sensors, and an Alarm for any sensor that is out of range.
 - **Sous Chef probes**: an Active switch for each probe, and a ring and a row for each probe that is on. Tap a row to open its preset and channels.

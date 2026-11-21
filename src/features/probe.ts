@@ -75,7 +75,7 @@ export class SousChefPreset extends SousChefFeature {
   protected override render(): TemplateResult | typeof nothing {
     const hass = this.hass, probe = this.probe;
     if (!hass || !probe) return nothing;
-    return preset(hass, probe, this._controls);
+    return preset(hass, probe, this._controls, this);
   }
 }
 

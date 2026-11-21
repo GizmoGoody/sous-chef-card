@@ -201,6 +201,6 @@ export class SousChefProbes extends SousChefFeature {
         <span class="grow">${name} · ${shown(hass, e.food_type)} · ${reading ? `${degrees(hass, internalSensor(hass, probe))} / ` : ""}${shown(hass, e.target)}</span>
         <span class="secondary">${status(hass, probe, this.timeFormat)}</span>
       </button>
-      ${open ? html`<div class="panel">${preset(hass, probe, this._controls)}${channels(hass, probe, this)}</div>` : nothing}`;
+      ${open ? html`<div class="panel">${preset(hass, probe, this._controls, this)}${channels(hass, probe, this)}</div>` : nothing}`;
   }
 }
