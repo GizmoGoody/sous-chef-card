@@ -2,5 +2,5 @@
   "name": "Sous Chef Card",
   "filename": "sous-chef-card.js",
   "hide_default_branch": true,
-  "homeassistant": "2025.10.0"
+  "homeassistant": "2026.11.0"
 }
