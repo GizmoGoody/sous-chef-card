@@ -4,6 +4,7 @@
 // tile features (select-options, numeric-input) in hui-card-features.
 import { html, nothing, type TemplateResult } from "lit";
 import { styleMap } from "lit/directives/style-map.js";
+import { showChartDialog } from "../chart/dialog";
 import { known, moreInfo, type Config, type HomeAssistant } from "../ha";
 import {
   colorsOf, internalSensor, maxChannel, progressOf, ringGradient, statusOf, STATUS_LABELS, swatch, type Probe, type Status,
@@ -79,8 +80,12 @@ function control(hass: HomeAssistant, controls: Controls, entityId: string | und
   return html`<hui-card-features .hass=${hass} .context=${context} .features=${features} .color=${color}></hui-card-features>`;
 }
 
-/** A probe's preset: Food type and Doneness, Target, and the source with its chart link. */
-export function preset(hass: HomeAssistant, probe: Probe, controls: Controls): TemplateResult {
+/**
+ * A probe's preset: Food type and Doneness, Target, and the source. Tapping
+ * the source opens its whole chart (the chart view); the icon beside it opens
+ * the published chart.
+ */
+export function preset(hass: HomeAssistant, probe: Probe, controls: Controls, host: EventTarget): TemplateResult {
   const e = probe.entities;
   const color = colorsOf(probe)[0];
   const source = e.source ? hass.states[e.source] : undefined;
@@ -95,9 +100,12 @@ export function preset(hass: HomeAssistant, probe: Probe, controls: Controls): T
     </div>
     ${control(hass, controls, e.target, { type: "numeric-input", style: "buttons" }, color)}
     <div class="source secondary">
+      <button class="chart" @click=${() => showChartDialog(host, {
+        name: probe.name, source: e.source, food_type: e.food_type, doneness: e.doneness, target: e.target,
+      })}>${shown(hass, e.source)}</button>
       ${typeof url === "string" && url
-        ? html`<a href=${url} target="_blank" rel="noopener noreferrer">${shown(hass, e.source)}<ha-icon icon="mdi:open-in-new"></ha-icon></a>`
-        : html`<span>${shown(hass, e.source)}</span>`}
+        ? html`<a href=${url} target="_blank" rel="noopener noreferrer" title="Open the published chart"><ha-icon icon="mdi:open-in-new"></ha-icon></a>`
+        : nothing}
       ${rest ? html`<span>Rest ${rest} min</span>` : nothing}
       ${hold ? html`<span>Hold ${hold} min</span>` : nothing}
     </div>

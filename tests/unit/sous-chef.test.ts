@@ -32,7 +32,9 @@ function kit(states: Record<string, string> = {}): HomeAssistant {
     states: all,
     entities,
     devices: { red: { id: "red", name: "RFX Probe Red" }, blue: { id: "blue", name: "RFX Probe Blue", name_by_user: null } },
-    callService: () => undefined,
+    callService: async () => undefined,
+    callWS: async () => undefined as never,
+    loadBackendTranslation: async () => (key: string) => key,
     formatEntityState: (s) => s.state,
   };
 }

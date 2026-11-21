@@ -109,7 +109,7 @@ export class SousChefCardEditor extends LitElement {
       <div class="sous-chef">
         <ha-form .hass=${this._hass} .schema=${this._schema()} .data=${{ probes: c.probes ?? [], ambient: c.ambient ?? [] }}
           .computeLabel=${label} .computeHelper=${helper} @value-changed=${this._changed}></ha-form>
-        <a class="manage" href=${MANAGE_PATH} target="_blank" rel="noopener"><ha-button appearance="plain">Manage</ha-button></a>
+        <ha-button class="manage" appearance="plain" href=${MANAGE_PATH} target="_blank" rel="noopener">Manage</ha-button>
       </div>
       ${this._tileEditor ?? ""}`;
   }
