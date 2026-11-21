@@ -2,7 +2,7 @@
 // card's entity) and its configuration. In the Sous Chef Card, the card
 // hands each feature its probes and ambient sensors; in any other tile card,
 // a feature follows the card's entity, or shows every probe.
-import { LitElement, type PropertyValues } from "lit";
+import { LitElement, type CSSResultGroup, type PropertyValues } from "lit";
 import { DEFAULT_TIME_FORMAT, TIME_FORMATS } from "../const";
 import type { Config, FeatureContext, HomeAssistant } from "../ha";
 import { probeOfEntity, probesFor, type Probe } from "../sous-chef";
@@ -15,7 +15,7 @@ export class SousChefFeature extends LitElement {
     _config: { state: true },
   };
 
-  static override styles = featureStyles;
+  static override styles: CSSResultGroup = featureStyles;
 
   // Its element's name, and its name in Home Assistant's feature picker
   static tag = "";

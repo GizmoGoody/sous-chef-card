@@ -11,7 +11,7 @@ type TileCard = { getConfigElement(): Promise<TileEditor> };
 
 /** The tile card editor's configuration: the card's, without its own options. */
 function tileEditorConfig(config: Config): Config {
-  const tile = { ...config, type: "tile" };
+  const tile: Config = { ...config, type: "tile" };
   for (const key of OWN_KEYS) delete tile[key];
   return tile;
 }
