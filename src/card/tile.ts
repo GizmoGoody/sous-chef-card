@@ -236,6 +236,7 @@ export class SousChefTile extends LitElement {
     if (icon?.shadowRoot && this._tile!.hasAttribute("sc-brand")) adopt(icon.shadowRoot, (iconSheet ??= sheetOf(ICON_SHEET)));
     this._styleFeatures();
     if (this.kind === "probe") this._placeFeatures();
+    else this._fullWidth();
     this._placeBadge(icon);
   }
 
@@ -266,6 +267,18 @@ export class SousChefTile extends LitElement {
       item.style.gridColumn = i < 0 ? "" : i === items.length - 1 && i % 2 === 0 ? "1 / -1" : `${(i % 2) + 1}`;
       item.style.alignSelf = "start";
     });
+  }
+
+  /**
+   * The grill's features below the title each across the whole card: with
+   * a feature beside the title, Home Assistant sets the others two to a row.
+   */
+  private _fullWidth(): void {
+    for (const group of findAllDeep(this._tile?.shadowRoot, 'hui-card-features:not([slot="features-inline"])')) {
+      for (const item of group.shadowRoot?.querySelectorAll<HTMLElement>("hui-card-feature") ?? []) {
+        if (item.style.gridColumn !== "1 / -1") item.style.gridColumn = "1 / -1";
+      }
+    }
   }
 
   /** The badge on the icon's edge, up and to the right (at the top right of a brand's mark). */

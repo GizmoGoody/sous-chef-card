@@ -281,6 +281,9 @@ export interface ChannelReading {
  * and the hottest, and its difference from the reference (the lowest, the
  * internal temperature as Sous Chef reads an RFX probe).
  */
+// The heat tint spans at least this many degrees, so channels a fraction apart look alike
+export const HEAT_SPAN = 10;
+
 export function channelReadings(values: (number | undefined)[], ids: string[]): ChannelReading[] {
   const shown = values.filter((v): v is number => v !== undefined);
   const lo = shown.length ? Math.min(...shown) : undefined, hi = shown.length ? Math.max(...shown) : undefined;
@@ -290,7 +293,7 @@ export function channelReadings(values: (number | undefined)[], ids: string[]): 
     const reference = i === refAt;
     return {
       id, value, reference, tip: i === 0,
-      heat: value !== undefined && lo !== undefined && hi !== undefined && hi > lo ? (value - lo) / (hi - lo) : 0,
+      heat: value !== undefined && lo !== undefined && hi !== undefined ? (value - lo) / Math.max(hi - lo, HEAT_SPAN) : 0,
       delta: value !== undefined && lo !== undefined && !reference ? Math.round(value - lo) : undefined,
     };
   });

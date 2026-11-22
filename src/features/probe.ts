@@ -202,10 +202,10 @@ export class SousChefTiming extends SousChefFeature {
     const timeTitle = done ? `Rest from the chart${rest > 0 ? `: ${rest} min` : ""}` : `Time left: ${left || "unknown"}`;
     return html`<div class="row" style=${styleMap({ "--c": colorOf(probe) })}>
       <button type="button" class="key" title=${rateTitle} aria-label=${rateTitle} @click=${() => moreInfo(this, e.rate)}>
-        <ha-icon .icon=${rateIcon(rate, 0.3)}></ha-icon><span class="num">${rateText(rate)}</span>
+        <ha-icon .icon=${rateIcon(rate, 0.3)}></ha-icon>${rate === undefined ? html`<span class="note">Rate</span>` : html`<span class="num">${rateText(rate)}</span>`}
       </button>
       <button type="button" class="key" title=${timeTitle} aria-label=${timeTitle} @click=${() => moreInfo(this, done ? e.doneness : e.done_at)}>
-        <ha-icon .icon=${done ? "mdi:timer-sand" : "mdi:timer-outline"}></ha-icon><span class="num">${left}</span>
+        <ha-icon .icon=${done ? "mdi:timer-sand" : "mdi:timer-outline"}></ha-icon>${left ? html`<span class="num">${left}</span>` : html`<span class="note">${done ? "Done" : "Time left"}</span>`}
       </button>
     </div>`;
   }

@@ -39,9 +39,13 @@ export const featureStyles = css`
   .note { font-size: 10px; font-weight: 400; text-transform: uppercase; letter-spacing: .04em; color: var(--secondary-text-color); }
   /* A number typed in place */
   .field input {
-    flex: 0 1 auto; width: 4ch; min-width: 0; margin: 0; padding: 0; border: 0; outline: none; background: transparent;
+    flex: 0 1 auto; width: calc(var(--len, 1) * 1ch + 2px); min-width: 0; margin: 0; padding: 0; border: 0; outline: none; background: transparent;
     font: inherit; font-size: var(--ha-font-size-m, 14px); color: inherit; text-align: center; font-variant-numeric: tabular-nums;
   }
+  /* Empty: as wide as the field, so the whole placeholder shows */
+  .field input.empty { flex: 1 1 auto; width: 100%; }
+  /* The degree sign right after the number */
+  .field .unit { flex: none; margin-left: -6px; }
   .field input::placeholder { color: var(--secondary-text-color); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; opacity: 1; }
   .field input::-webkit-outer-spin-button, .field input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .field input[type="number"] { -moz-appearance: textfield; appearance: textfield; }

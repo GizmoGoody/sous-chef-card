@@ -122,7 +122,7 @@ export class SousChefAmbient extends SousChefFeature {
     const title = `Grill trend: ${rate === undefined ? "unknown" : rateText(rate)}`;
     return html`<div class="row" style=${styleMap({ "--c": cssColor(GRILL_COLOR) })}>
       <button type="button" class="key" title=${title} aria-label=${title} @click=${() => moreInfo(this, ambient.sensor)}>
-        <ha-icon .icon=${rateIcon(rate, 0.5)}></ha-icon><span class="num">${rateText(rate)}</span>
+        <ha-icon .icon=${rateIcon(rate, 0.5)}></ha-icon>${rate === undefined ? html`<span class="note">Trend</span>` : html`<span class="num">${rateText(rate)}</span>`}
       </button>
       ${numberField(hass, ambient.low, {
         icon: "mdi:thermometer-chevron-down", placeholder: "Off", empty: 0,
@@ -252,7 +252,7 @@ export class SousChefHistory extends SousChefFeature {
         entities.push({ entity: p.entities.target, name: `${names.get(p.device)} target`, color: dim(color, dark) });
       }
     }
-    return { type: "history-graph", entities, hours_to_show: HOURS, grid_options: { rows: 4 } };
+    return { type: "history-graph", entities, hours_to_show: HOURS, expand_legend: true, grid_options: { rows: 4 } };
   }
 
   /** The projections: the grill level, each probe toward its target at its Done at time (or at its rate). */

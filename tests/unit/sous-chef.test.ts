@@ -84,6 +84,8 @@ describe("a probe's readings", () => {
     expect(ch[0].reference && ch[0].tip).toBe(true);
     expect(ch.map((c) => c.heat)).toEqual([0, 5 / 16, 9 / 16, 1]);
   });
+  it("channels a fraction of a degree apart look alike", () =>
+    expect(channelReadings([68.1, 68.4], ["a", "b"])[1].heat).toBeCloseTo(0.03));
   it("the reference need not be the tip", () => {
     const ch = channelReadings([96, 91, 99], ["a", "b", "c"]);
     expect(ch.map((c) => c.reference)).toEqual([false, true, false]);

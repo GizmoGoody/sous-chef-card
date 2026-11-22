@@ -45,7 +45,14 @@ export function numberField(hass: HomeAssistant, entityId: string | undefined, o
   const disabled = hass.states[entityId].state === "unavailable";
   return html`<label class="field ${o.alarm ? "alarm" : ""} ${o.cls ?? ""}" title=${o.title} style=${o.style ?? ""}>
     ${o.icon ? html`<ha-icon .icon=${o.icon}></ha-icon>` : nothing}
-    <input type="number" inputmode="numeric" .value=${value} placeholder=${o.placeholder} aria-label=${o.title} ?disabled=${disabled}
+    <input type="number" inputmode="numeric" class=${value ? "" : "empty"} style="--len: ${value.length || 1}" .value=${value}
+      placeholder=${o.placeholder} aria-label=${o.title} ?disabled=${disabled}
+      @input=${(ev: Event) => {
+        // The field fits its number, so the degree sign sits right after it
+        const input = ev.target as HTMLInputElement;
+        input.style.setProperty("--len", String(input.value.length || 1));
+        input.classList.toggle("empty", !input.value);
+      }}
       @keydown=${(ev: KeyboardEvent) => ev.key === "Enter" && (ev.target as HTMLInputElement).blur()}
       @change=${(ev: Event) => setFrom(hass, entityId, ev.target as HTMLInputElement, o.empty)}
     />${value ? html`<span class="unit">°</span>` : nothing}
