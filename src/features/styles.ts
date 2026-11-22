@@ -2,9 +2,9 @@
 // draws them (Home Assistant's own feature spacing, height and radius), each
 // tinted in its color (--c). On a style, Flat sets each control on a plain
 // patch of the finish (--sc-backing), and Console makes the keys press in.
-import { css } from "lit";
+import { css, unsafeCSS } from "lit";
 
-const ENABLED = "var(--feature-color, var(--state-icon-color, var(--primary-color)))";
+const ENABLED = unsafeCSS("var(--feature-color, var(--state-icon-color, var(--primary-color)))");
 
 export const featureStyles = css`
   :host { display: block; min-width: 0; max-width: 100%; }
