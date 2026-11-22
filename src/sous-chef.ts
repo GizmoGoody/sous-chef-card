@@ -203,7 +203,7 @@ export function clockText(date: Date, hass?: HomeAssistant): string {
   const format = hass?.locale?.time_format;
   const hour12 = format === "12" ? true : format === "24" ? false : undefined;
   // Some browsers put a narrow space before AM and PM: a plain one reads the same everywhere
-  return date.toLocaleTimeString(hass?.locale?.language, { hour: "numeric", minute: "2-digit", hour12 }).replace(/ /g, " ");
+  return date.toLocaleTimeString(hass?.locale?.language, { hour: "numeric", minute: "2-digit", hour12 }).replace(/\u202f/g, " ");
 }
 
 /** When a probe will be done (its Done at sensor), or undefined. */
