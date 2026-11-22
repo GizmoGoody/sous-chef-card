@@ -6,7 +6,7 @@
 // probe's Source, Food type and Doneness through their select_option
 // actions; the integration sets the target from the doneness.
 import { css, html, LitElement, nothing, type TemplateResult } from "lit";
-import { fire, known, type HomeAssistant } from "../ha";
+import { fire, known, type HassEntity, type HomeAssistant } from "../ha";
 import { CHARTS_COMMAND, labelOf, rowsOf, stepsFor, temperatureOf, timesOf, type Charts, type ChartSource } from "./data";
 
 export const CHART_DIALOG = "sous-chef-chart-dialog";
@@ -90,7 +90,7 @@ export class SousChefChartDialog extends LitElement {
 
   protected override render(): TemplateResult | typeof nothing {
     if (!this._params || !this.hass) return nothing;
-    return html`<ha-dialog .open=${this._open} header-title="Chart" header-subtitle=${this._params.name} @closed=${this._closed}>
+    return html`<ha-dialog .open=${this._open} header-title=${this._params.name} header-subtitle="Choose a doneness" @closed=${this._closed}>
       ${this._error ? html`<ha-alert alert-type="error">${this._error}</ha-alert>` : nothing}
       ${this._charts ? this._renderChart() : this._error ? nothing : html`<div class="loading"><ha-spinner></ha-spinner></div>`}
     </ha-dialog>`;
@@ -104,7 +104,7 @@ export class SousChefChartDialog extends LitElement {
         .selector=${{ select: { mode: "dropdown", options } }} @value-changed=${this._sourceChanged}></ha-selector>
       ${chart?.url
         ? html`<ha-button class="link" appearance="plain" size="s" href=${chart.url} target="_blank" rel="noopener noreferrer">
-            Open the published chart<ha-icon slot="end" icon="mdi:open-in-new"></ha-icon></ha-button>`
+            Open the chart<ha-icon slot="end" icon="mdi:open-in-new"></ha-icon></ha-button>`
         : nothing}
       ${chart ? this._renderList(chart) : nothing}`;
   }
@@ -119,7 +119,9 @@ export class SousChefChartDialog extends LitElement {
     return html`<ha-list-selectable controlled ?inert=${this._busy} @ha-list-item-selected=${this._chosen}>
       ${chart.foods.map((food, f) => html`
         <ha-section-title>${food.icon ? html`<ha-icon icon=${food.icon}></ha-icon>` : nothing}
-          ${labelOf(this._localize, "food_type", food.key, chart.key)}</ha-section-title>
+          <span class="food">${labelOf(this._localize, "food_type", food.key, chart.key)}</span>
+          ${food.safe_minimum ? html`<span class="safe">Safe minimum ${this._temperature(target, unit, temperatureOf(food.safe_minimum, unit))}</span>` : nothing}
+        </ha-section-title>
         ${food.levels.map((level, l) => {
           const temperature = temperatureOf(level, unit);
           const times = timesOf(level);
@@ -127,10 +129,15 @@ export class SousChefChartDialog extends LitElement {
           return html`<ha-list-item-option .selected=${selected} value=${String(offsets[f] + l)}>
             <span slot="headline">${labelOf(this._localize, "doneness", level.key, chart.key)}</span>
             ${times ? html`<span slot="supporting-text">${times}</span>` : nothing}
-            <span slot="end" class="temperature">${target ? this.hass!.formatEntityState(target, String(temperature)) : `${temperature} ${unit ?? "°F"}`}</span>
+            <span slot="end" class="temperature">${this._temperature(target, unit, temperature)}</span>
           </ha-list-item-option>`;
         })}`)}
     </ha-list-selectable>`;
+  }
+
+  /** A temperature as the probe's Target shows it (130 °F). */
+  private _temperature(target: HassEntity | undefined, unit: string | undefined, value: number): string {
+    return target ? this.hass!.formatEntityState(target, String(value)) : `${value} ${unit ?? "°F"}`;
   }
 
   private _sourceChanged(ev: CustomEvent): void {
@@ -178,6 +185,8 @@ export class SousChefChartDialog extends LitElement {
     ha-section-title {
       gap: var(--ha-space-2, 8px);
     }
+    ha-section-title .food { flex: 1; min-width: 0; }
+    ha-section-title .safe { font-weight: 400; white-space: nowrap; }
     ha-section-title ha-icon {
       --mdc-icon-size: 18px;
     }

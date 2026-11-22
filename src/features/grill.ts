@@ -1,206 +1,357 @@
-// The features of a grill (the grill view): Ambient, and Probes.
-import { css, html, nothing, type TemplateResult } from "lit";
+// The grill's features:
+// - Sous Chef probes: a key for each probe beside the grill's name, pressed while it is on
+// - Sous Chef history: Home Assistant's history graph of the grill and the probes, with projections
+// - Sous Chef ambient: the grill's trend, and its low and high alarms
+import { css, html, nothing, svg, type TemplateResult } from "lit";
 import { styleMap } from "lit/directives/style-map.js";
-import { FEATURES } from "../const";
-import { entityName, moreInfo, type HomeAssistant } from "../ha";
+import { FEATURES, GRILL_COLOR } from "../const";
+import { cssColor, darkMode, dim, entityName, findDeep, moreInfo, numberOf, toHex, type Config, type HomeAssistant } from "../ha";
 import {
-  ambientsFor, colorsOf, internalSensor, isActive, probesFor, shortNames, statusOf, swatch, type Ambient, type Probe,
+  allProbes, colorOf, doneAtOf, internalSensor, internalValue, isActive, probeNames, rateIcon, rateText, statusOf, trendOf,
+  valueOf, type Probe,
 } from "../sous-chef";
+import { SousChefFeature } from "./base";
+import { numberField } from "./field";
 import { featureStyles } from "./styles";
-import { probeEntities, SousChefFeature } from "./base";
-import { channels, Controls, degrees, pill, preset, ring, shown, status, swatchOf } from "./parts";
 
-const alarmOn = (hass: HomeAssistant, ambient: Ambient) => hass.states[ambient.alarm]?.state === "on";
+const probeEntityIds = (probe: Probe): string[] =>
+  [...Object.values(probe.entities), ...probe.channels, ...(probe.internal ? [probe.internal] : [])].filter((id): id is string => !!id);
 
-/**
- * The ambient sensors and their alarms. The tile card's own entity is in its
- * header, so for it only its alarm shows, while it is on.
- */
-export class SousChefAmbient extends SousChefFeature {
-  static override tag = FEATURES.ambient;
-  static override pickerName = "Sous Chef ambient";
+/** A key for each probe: its color, pressed while it is on; a tap turns it on or off (its Active switch). */
+export class SousChefProbes extends SousChefFeature {
+  static override tag = FEATURES.probes;
+  static override pickerName = "Sous Chef probes";
+  static override forKind = "grill" as const;
 
-  static override styles = [
-    featureStyles,
-    css`
-      .ambient {
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--sc-gap);
-      }
-      .ambient button {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        min-height: 32px;
-        padding: 0 12px;
-        border-radius: var(--sc-radius);
-        background: var(--sc-surface);
-        font-size: 13px;
-      }
-    `,
-  ];
-
-  private get _ambients(): Ambient[] {
-    return this.hass ? ambientsFor(this.hass, this._config?.ambient) : [];
-  }
+  static override styles = [featureStyles, css`
+    .row { justify-content: flex-end; }
+    .key { flex: 0 0 36px; min-width: 36px; padding: 0; border-radius: var(--feature-border-radius, 18px); }
+    .key[aria-pressed="false"] ha-icon { color: var(--c); }
+  `];
 
   protected override watched(): string[] {
-    return this._ambients.flatMap((a) => [a.sensor, a.alarm]);
+    return this._hass ? allProbes(this._hass).flatMap((p) => [p.entities.active, p.entities.progress].filter((id): id is string => !!id)) : [];
   }
 
   protected override render(): TemplateResult | typeof nothing {
-    const hass = this.hass;
-    if (!hass) return nothing;
-    const own = this.context?.entity_id;
-    const shownHere = this._ambients.filter((a) => a.sensor !== own || alarmOn(hass, a));
-    if (!shownHere.length) return nothing;
-    return html`<div class="ambient">
-      ${shownHere.map((a) => html`<button class="num" @click=${() => moreInfo(this, alarmOn(hass, a) ? a.alarm : a.sensor)}>
-        <span>${entityName(hass, a.sensor)}</span>
-        ${a.sensor !== own ? html`<span class="secondary">${shown(hass, a.sensor)}</span>` : nothing}
-        ${alarmOn(hass, a) ? pill("alarm") : nothing}
-      </button>`)}
+    const hass = this._hass!;
+    const probes = allProbes(hass);
+    this.showNothing(!probes.length);
+    if (!probes.length) return nothing;
+    const names = probeNames(probes);
+    return html`<div class="row tight" role="group" aria-label="Probes">
+      ${probes.map((p) => {
+        const on = isActive(hass, p);
+        const title = `${names.get(p.device)}: ${on ? "on" : "off. Take it off its charger, or tap to turn it on"}`;
+        return html`<button type="button" class="key" aria-pressed=${on ? "true" : "false"} title=${title} aria-label=${title}
+          style=${styleMap({ "--c": colorOf(p), "--sc-on-color": p.colors[0] === "yellow" || p.colors[0] === "white" ? "rgba(0,0,0,.85)" : "#fff" })}
+          ?disabled=${hass.states[p.entities.active!]?.state === "unavailable"}
+          @click=${() => this.call("switch", on ? "turn_off" : "turn_on", { entity_id: p.entities.active })}>
+          <ha-icon icon="mdi:thermometer-probe"></ha-icon>
+        </button>`;
+      })}
     </div>`;
   }
 }
 
 /**
- * A switch for each probe (its Active switch), and a ring and a row for each
- * probe that is on. Tapping a row opens that probe's preset and channels.
+ * The grill's trend (degrees a minute over the last five minutes, from its
+ * history and its readings since), then its low and high alarms, typed in
+ * place. A field turns red while the grill is past it.
  */
-export class SousChefProbes extends SousChefFeature {
-  static override properties = { ...SousChefFeature.properties, _open: { state: true } };
-  static override tag = FEATURES.probes;
-  static override pickerName = "Sous Chef probes";
+export class SousChefAmbient extends SousChefFeature {
+  static override tag = FEATURES.ambient;
+  static override pickerName = "Sous Chef ambient";
+  static override forKind = "grill" as const;
 
-  static override styles = [
-    featureStyles,
-    css`
-      .probes {
-        display: grid;
-        gap: var(--sc-gap);
-      }
-      ha-control-button-group {
-        --control-button-group-spacing: 6px;
-        height: var(--feature-height, 42px);
-      }
-      ha-control-button {
-        --control-button-border-radius: var(--sc-radius);
-        --control-button-padding: 0 6px;
-        font-size: 12px;
-      }
-      ha-control-button .face {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        min-width: 0;
-        opacity: 0.55;
-      }
-      ha-control-button.on {
-        --control-button-background-color: var(--swatch-on);
-        --control-button-background-opacity: 0.25;
-      }
-      ha-control-button.on .face {
-        opacity: 1;
-        font-weight: 600;
-      }
-      .face .name {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .rings {
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--sc-gap);
-      }
-      .row {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        width: 100%;
-        box-sizing: border-box;
-        min-height: 36px;
-        padding: 6px 10px;
-        border-radius: var(--sc-radius);
-        background: var(--sc-surface);
-        font-size: 13px;
-      }
-      .row .grow {
-        flex: 1;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .panel {
-        display: grid;
-        gap: var(--sc-gap);
-        padding: var(--sc-gap);
-        border: 1px solid var(--divider-color);
-        border-radius: var(--sc-radius);
-      }
-      .empty {
-        color: var(--secondary-text-color);
-        font-size: 13px;
-        padding: 4px 2px;
-      }
-    `,
-  ];
+  private _samples: [number, number][] = [];
+  private _loaded?: string;
+  private _clock?: ReturnType<typeof setInterval>;
 
-  // The probe whose preset and channels are open
-  private _open?: string;
-  private _controls = new Controls();
-
-  private get _probes(): Probe[] {
-    return this.hass ? probesFor(this.hass, this._config?.probes) : [];
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this._clock = setInterval(() => this.requestUpdate(), 30000);
   }
 
-  protected override watched(): string[] {
-    return this._probes.flatMap(probeEntities);
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    clearInterval(this._clock);
   }
 
-  private _toggle(probe: Probe): void {
-    this.hass?.callService("switch", "toggle", { entity_id: probe.entities.active });
+  /** The grill's readings of the last ten minutes, from Home Assistant's history. */
+  private async _load(sensor: string): Promise<void> {
+    this._loaded = sensor;
+    try {
+      const start = new Date(Date.now() - 10 * 60000).toISOString();
+      const result = await this._hass!.callWS<Record<string, { s: string; lu: number }[]>>({
+        type: "history/history_during_period", start_time: start, entity_ids: [sensor],
+        minimal_response: true, no_attributes: true, significant_changes_only: false,
+      });
+      const past = (result?.[sensor] ?? []).map((row): [number, number] => [row.lu * 1000, Number(row.s)]).filter(([, v]) => Number.isFinite(v));
+      this._samples = [...past, ...this._samples].sort((a, b) => a[0] - b[0]);
+      this.requestUpdate();
+    } catch {
+      // Without history, the trend follows the readings from now on
+    }
+  }
+
+  private _sample(sensor: string): void {
+    const stateObj = this._hass!.states[sensor];
+    const value = numberOf(stateObj);
+    if (value === undefined) return;
+    const t = Date.parse(stateObj.last_updated ?? "") || Date.now();
+    const last = this._samples[this._samples.length - 1];
+    if (!last || last[0] !== t) this._samples.push([t, value]);
+    const keep = Date.now() - 15 * 60000;
+    while (this._samples.length && this._samples[0][0] < keep) this._samples.shift();
   }
 
   protected override render(): TemplateResult | typeof nothing {
-    const hass = this.hass;
-    if (!hass) return nothing;
-    const probes = this._probes;
-    if (!probes.length) return nothing;
-    const names = shortNames(probes.map((p) => p.name));
-    const nameOf = new Map(probes.map((p, i) => [p.device, names[i]]));
-    const active = probes.filter((p) => isActive(hass, p));
-    return html`<div class="probes">
-      <ha-control-button-group>
-        ${probes.map((p) => {
-          const on = isActive(hass, p);
-          return html`<ha-control-button class=${on ? "on" : ""} .label=${`${p.name}: ${on ? "on" : "off"}`}
-            style=${styleMap({ "--swatch-on": colorsOf(p)[0] })} @click=${() => this._toggle(p)}>
-            <span class="face"><span class="swatch" style=${styleMap({ "--swatch": swatch(colorsOf(p)) })}></span>
-              <span class="name">${nameOf.get(p.device)}</span></span>
-          </ha-control-button>`;
-        })}
-      </ha-control-button-group>
-      ${active.length
-        ? html`<div class="rings">${active.map((p) => ring(hass, p, this, true))}</div>
-          ${active.map((p) => this._row(hass, p, nameOf.get(p.device)!))}`
-        : html`<div class="empty">No active probes.</div>`}
+    const hass = this._hass!, ambient = this.ambient;
+    this.showNothing(!ambient);
+    if (!ambient) return nothing;
+    if (this._loaded !== ambient.sensor) {
+      this._samples = [];
+      this._load(ambient.sensor);
+    }
+    this._sample(ambient.sensor);
+    const rate = trendOf(this._samples);
+    const value = valueOf(hass, ambient.sensor);
+    const alarm = hass.states[ambient.alarm]?.state === "on";
+    const low = valueOf(hass, ambient.low), high = valueOf(hass, ambient.high);
+    const title = `Grill trend: ${rate === undefined ? "unknown" : rateText(rate)}`;
+    return html`<div class="row" style=${styleMap({ "--c": cssColor(GRILL_COLOR) })}>
+      <button type="button" class="key" title=${title} aria-label=${title} @click=${() => moreInfo(this, ambient.sensor)}>
+        <ha-icon .icon=${rateIcon(rate, 0.5)}></ha-icon><span class="num">${rateText(rate)}</span>
+      </button>
+      ${numberField(hass, ambient.low, {
+        icon: "mdi:thermometer-chevron-down", placeholder: "Off", empty: 0,
+        title: "Low alarm: Sous Chef alerts when the grill falls below it",
+        alarm: alarm && value !== undefined && !!low && value < low,
+      })}
+      ${numberField(hass, ambient.high, {
+        icon: "mdi:thermometer-chevron-up", placeholder: "Off", empty: 0,
+        title: "High alarm: Sous Chef alerts when the grill rises above it",
+        alarm: alarm && value !== undefined && !!high && value > high,
+      })}
+    </div>`;
+  }
+}
+
+type Card = HTMLElement & { setConfig(config: Config): void; hass?: HomeAssistant };
+// What the card reads of the history graph's chart (Apache ECharts, inside Home Assistant's ha-chart-base)
+type Chart = {
+  getDom(): HTMLElement;
+  getModel(): { getComponent(type: string, index: number): any };
+};
+
+const HOURS = 1;
+// The share of the width the projections take, right of the history
+const AHEAD = 0.3;
+
+/** A projection: from now and a reading, to a time ahead (0 to 1 of the hour ahead) and a reading. */
+interface Projection {
+  color: string;
+  from: number;
+  to: number;
+  at: number;
+}
+
+/**
+ * The grill and every probe that is on, in Home Assistant's own history
+ * graph card, as the Prusa Connect card's history: each probe in its color
+ * and its target the same color dimmed, the grill in orange. The key at the
+ * top right shows projected temperatures: Home Assistant's graph ends at
+ * now, so the hour ahead is drawn beside it, on the graph's own scale, each
+ * probe dashed toward its target (reached at its Done at time) and the
+ * grill holding its temperature.
+ */
+export class SousChefHistory extends SousChefFeature {
+  static override tag = FEATURES.history;
+  static override pickerName = "Sous Chef history";
+  static override forKind = "grill" as const;
+
+  static override styles = [featureStyles, css`
+    .box {
+      position: relative; display: flex; height: var(--sc-history-height, 240px); box-sizing: border-box; overflow: hidden;
+      border-radius: var(--feature-border-radius, 12px); background: var(--sc-screen, var(--sc-backing, var(--sc-scrim, transparent)));
+      --ha-card-background: transparent; --card-background-color: transparent; --ha-card-box-shadow: none;
+      --ha-card-border-width: 0; --ha-card-border-color: transparent; --ha-card-backdrop-filter: none;
+    }
+    :host([sc-console]) .box { box-shadow: inset 0 3px 6px rgba(0,0,0,.6); }
+    /* Home Assistant's history graph card sizes its chart from its own height: it needs a box of a set height to fill */
+    .graph { flex: 1 1 auto; min-width: 0; height: 100%; }
+    .graph > * { display: block; height: 100%; }
+    .ahead { position: relative; flex: 0 0 ${AHEAD * 100}%; height: 100%; display: none; }
+    .projected .ahead { display: block; }
+    .ahead svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+    .ahead .label { position: absolute; right: 4px; font-size: 11px; color: var(--secondary-text-color); }
+    .project { position: absolute; top: 6px; right: 8px; width: 28px; height: 28px; flex: none; min-width: 28px; padding: 0; z-index: 1;
+      border-radius: 14px; }
+    .project ha-icon { --mdc-icon-size: 18px; }
+  `];
+
+  private _graph?: Card;
+  private _loading = false;
+  private _shown?: string;
+  private _projected = false;
+  private _resize = new ResizeObserver(() => this._drawAhead());
+  private _ahead: Projection[] = [];
+  private _scale?: { top: number; bottom: number; min: number; max: number };
+  private _warned = false;
+
+  protected override watched(): string[] {
+    const hass = this._hass, ambient = this.ambient;
+    if (!hass || !ambient) return [];
+    return [ambient.sensor, ...allProbes(hass).flatMap(probeEntityIds)];
+  }
+
+  private get _storageKey(): string {
+    return `sous-chef-card:projected:${this._context?.entity_id}`;
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    try {
+      this._projected = window.localStorage.getItem(this._storageKey) === "1";
+    } catch {
+      // Storage can be unavailable (private windows)
+    }
+    this._resize.observe(this);
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._resize.disconnect();
+  }
+
+  private _toggle(): void {
+    this._projected = !this._projected;
+    try {
+      window.localStorage.setItem(this._storageKey, this._projected ? "1" : "0");
+    } catch {
+      // The choice still holds while the page is open
+    }
+    this.requestUpdate();
+  }
+
+  /** The history graph card's configuration: the grill, then each probe that is on and its target. */
+  private _graphConfig(): Config | undefined {
+    const hass = this._hass!, ambient = this.ambient;
+    if (!ambient) return undefined;
+    const dark = darkMode(hass);
+    const hex = (color: string) => toHex(this, color) ?? "#ff9800";
+    const probes = allProbes(hass).filter((p) => isActive(hass, p));
+    const names = probeNames(probes);
+    const entities: Config[] = [{ entity: ambient.sensor, name: entityName(hass, ambient.sensor), color: hex(cssColor(GRILL_COLOR)) }];
+    for (const p of probes) {
+      const reading = internalSensor(hass, p);
+      const color = hex(colorOf(p));
+      if (reading) entities.push({ entity: reading, name: names.get(p.device), color });
+      if (p.entities.target && valueOf(hass, p.entities.target) !== undefined) {
+        entities.push({ entity: p.entities.target, name: `${names.get(p.device)} target`, color: dim(color, dark) });
+      }
+    }
+    return { type: "history-graph", entities, hours_to_show: HOURS, grid_options: { rows: 4 } };
+  }
+
+  /** The projections: the grill level, each probe toward its target at its Done at time (or at its rate). */
+  private _projections(): Projection[] {
+    const hass = this._hass!, ambient = this.ambient!;
+    const out: Projection[] = [];
+    const grill = valueOf(hass, ambient.sensor);
+    const hex = (color: string) => toHex(this, color) ?? "#ff9800";
+    if (grill !== undefined) out.push({ color: hex(cssColor(GRILL_COLOR)), from: grill, to: grill, at: 1 });
+    const now = Date.now();
+    for (const p of allProbes(hass).filter((probe) => isActive(hass, probe))) {
+      const status = statusOf(hass, p);
+      const internal = internalValue(hass, p), target = valueOf(hass, p.entities.target);
+      if (internal === undefined || status === "no_reading" || status === "done") continue;
+      const doneAt = doneAtOf(hass, p);
+      const rate = valueOf(hass, p.entities.rate);
+      if (target !== undefined && doneAt && doneAt.getTime() > now) {
+        const minutes = (doneAt.getTime() - now) / 60000;
+        const reach = Math.min(1, 60 / minutes);
+        out.push({ color: hex(colorOf(p)), from: internal, to: internal + (target - internal) * reach, at: Math.min(1, minutes / 60) });
+      } else if (rate !== undefined) {
+        const to = target !== undefined && rate > 0 ? Math.min(target, internal + rate * 60) : internal + rate * 60;
+        out.push({ color: hex(colorOf(p)), from: internal, to, at: 1 });
+      }
+    }
+    return out;
+  }
+
+  protected override render(): TemplateResult | typeof nothing {
+    const config = this._graphConfig();
+    this.showNothing(!config);
+    if (!config) return nothing;
+    const key = JSON.stringify(config);
+    if (key !== this._shown) {
+      this._shown = key;
+      if (this._graph) this._graph.setConfig(config);
+      else if (!this._loading) {
+        // Home Assistant's history graph card, made by its card helpers as a dashboard makes it
+        this._loading = true;
+        window.loadCardHelpers?.().then((helpers) => {
+          this._graph = helpers.createCardElement(JSON.parse(this._shown!)) as Card;
+          this.requestUpdate();
+        });
+      }
+    }
+    if (this._graph) this._graph.hass = this._hass;
+    this._ahead = this._projected ? this._projections() : [];
+    const s = this._scale;
+    const y = (v: number) => (s && s.max > s.min ? s.top + ((s.max - v) / (s.max - s.min)) * (s.bottom - s.top) : -100);
+    return html`<div class="box ${this._projected ? "projected" : ""}">
+      <div class="graph">${this._graph ?? nothing}</div>
+      <div class="ahead" aria-hidden="true">
+        <svg>
+          ${s ? svg`<line x1="0" x2="0" y1=${s.top} y2=${s.bottom} stroke="currentColor" stroke-opacity=".45" stroke-dasharray="2 3"></line>` : nothing}
+          ${s ? this._ahead.map((p) => svg`<line x1="0" y1=${y(p.from)} x2=${`${p.at * 100}%`} y2=${y(p.to)} stroke=${p.color}
+            stroke-width="2" stroke-dasharray="5 4" stroke-linecap="round"></line>`) : nothing}
+        </svg>
+        ${s ? html`<span class="label" style=${styleMap({ top: `${s.bottom + 6}px` })}>+${HOURS} h</span>` : nothing}
+      </div>
+      <button type="button" class="key project" aria-pressed=${this._projected ? "true" : "false"} title="Projected temperatures"
+        aria-label="Projected temperatures" style=${styleMap({ "--c": cssColor(GRILL_COLOR) })} @click=${this._toggle}>
+        <ha-icon icon="mdi:chart-timeline-variant"></ha-icon>
+      </button>
     </div>`;
   }
 
-  private _row(hass: HomeAssistant, probe: Probe, name: string): TemplateResult {
-    const e = probe.entities;
-    const open = this._open === probe.device;
-    const reading = !["off", "no_reading"].includes(statusOf(hass, probe));
-    return html`<button class="row num" aria-expanded=${open ? "true" : "false"}
-        @click=${() => (this._open = open ? undefined : probe.device)}>
-        ${swatchOf(probe)}
-        <span class="grow">${name} · ${shown(hass, e.food_type)} · ${reading ? `${degrees(hass, internalSensor(hass, probe))} / ` : ""}${shown(hass, e.target)}</span>
-        <span class="secondary">${status(hass, probe, this.timeFormat)}</span>
-      </button>
-      ${open ? html`<div class="panel">${preset(hass, probe, this._controls, this)}${channels(hass, probe, this)}</div>` : nothing}`;
+  protected override updated(): void {
+    if (this._projected) requestAnimationFrame(() => this._drawAhead());
+  }
+
+  /**
+   * The graph's own scale, read from its chart (Apache ECharts, which Home
+   * Assistant's charts use): the plot's top and bottom in this box, and the
+   * temperatures there, so the hour ahead lines up with the history. If a
+   * Home Assistant update changes the chart, the projections are not drawn.
+   */
+  private _drawAhead(): void {
+    if (!this._projected || !this._graph) return;
+    try {
+      const base = findDeep(this._graph.shadowRoot, "ha-chart-base") as (HTMLElement & { chart?: Chart }) | null;
+      const chart = base?.chart;
+      if (!chart) {
+        setTimeout(() => this._drawAhead(), 500);
+        return;
+      }
+      const model = chart.getModel();
+      const extent: [number, number] = model.getComponent("yAxis", 0).axis.scale.getExtent();
+      const rect = model.getComponent("grid", 0).coordinateSystem.getRect();
+      const box = this.renderRoot.querySelector(".box")!.getBoundingClientRect();
+      const dom = chart.getDom().getBoundingClientRect();
+      const scale = { top: dom.top - box.top + rect.y, bottom: dom.top - box.top + rect.y + rect.height, min: extent[0], max: extent[1] };
+      const old = this._scale;
+      if (!old || Object.entries(scale).some(([k, v]) => Math.abs(v - old[k as keyof typeof scale]) > 0.5)) {
+        this._scale = scale;
+        this.requestUpdate();
+      }
+    } catch {
+      if (!this._warned) console.warn("Sous Chef card: could not read the history graph's scale for the projections");
+      this._warned = true;
+    }
   }
 }

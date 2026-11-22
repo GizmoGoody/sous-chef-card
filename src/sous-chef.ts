@@ -1,7 +1,8 @@
 // The Sous Chef entities of a probe or an ambient sensor, found through the
-// entity registry: platform sous_chef, the device, and the translation key.
+// entity registry (platform sous_chef, the device, and the translation key),
+// and what the card makes of them. Pure, so the unit tests can check them.
 import { DOMAIN } from "./const";
-import { cssColor, deviceName, domainOf, known, numberOf, type HomeAssistant } from "./ha";
+import { cssColor, deviceName, domainOf, known, numberOf, type HassEntity, type HomeAssistant } from "./ha";
 
 // A probe's entities the card uses, by translation key, with their domain
 const PROBE_KEYS = {
@@ -10,6 +11,8 @@ const PROBE_KEYS = {
   food_type: "select",
   doneness: "select",
   target: "number",
+  alarm_high: "number",
+  alarm_low: "number",
   progress: "sensor",
   rate: "sensor",
   done_at: "sensor",
@@ -19,6 +22,9 @@ const PROBE_KEYS = {
   alarm: "binary_sensor",
 } as const;
 export type ProbeKey = keyof typeof PROBE_KEYS;
+
+// The doneness that is no preset: any target
+export const CUSTOM = "custom";
 
 export interface Probe {
   device: string;
@@ -30,12 +36,16 @@ export interface Probe {
   channels: string[];
   // Home Assistant's named colors; none for no colors
   colors: string[];
+  // The internal temperature the cook started at
+  start?: number;
 }
 
 export interface Ambient {
-  // The ambient temperature sensor (the brand's), and its Sous Chef Alarm
+  // The ambient temperature sensor (the brand's), its Sous Chef Alarm, and its alarm limits
   sensor: string;
   alarm: string;
+  low?: string;
+  high?: string;
 }
 
 export type Status = "off" | "alarm" | "done" | "stalled" | "no_reading" | "cooking";
@@ -72,6 +82,7 @@ export function probeOf(hass: HomeAssistant, device?: string | null): Probe | un
     internal: typeof attributes.internal === "string" ? attributes.internal : null,
     channels: Array.isArray(attributes.channels) ? attributes.channels : [],
     colors: Array.isArray(attributes.colors) ? attributes.colors : [],
+    start: typeof attributes.start === "number" ? attributes.start : undefined,
   };
 }
 
@@ -79,28 +90,31 @@ export function probeOf(hass: HomeAssistant, device?: string | null): Probe | un
 export const probeOfEntity = (hass: HomeAssistant, entityId?: string): Probe | undefined =>
   entityId ? probeOf(hass, hass.entities?.[entityId]?.device_id) : undefined;
 
-/** The Sous Chef ambient sensors: each Alarm names its sensor. */
+/** Every probe, in the order Sous Chef lists them. */
+export const allProbes = (hass: HomeAssistant): Probe[] =>
+  probeDevices(hass).map((device) => probeOf(hass, device)).filter((probe): probe is Probe => !!probe);
+
+/** The Sous Chef ambient sensors: each Alarm names its sensor; its limits sit on the same device. */
 export function ambients(hass: HomeAssistant): Ambient[] {
-  return sousChefEntries(hass)
+  const entries = sousChefEntries(hass);
+  return entries
     .filter((entry) => entry.translation_key === "alarm" && domainOf(entry.entity_id) === "binary_sensor")
-    .map((entry) => ({ sensor: hass.states[entry.entity_id]?.attributes.sensor, alarm: entry.entity_id }))
-    .filter((ambient): ambient is Ambient => typeof ambient.sensor === "string");
+    .flatMap((entry) => {
+      const sensor = hass.states[entry.entity_id]?.attributes.sensor;
+      if (typeof sensor !== "string") return [];
+      const limit = (key: string) => entries.find((e) => e.device_id === entry.device_id && e.translation_key === key
+        && domainOf(e.entity_id) === "number")?.entity_id;
+      return [{ sensor, alarm: entry.entity_id, low: limit("alarm_low"), high: limit("alarm_high") }];
+    });
 }
 
-/** The probes to show: those chosen, in their order, or every probe. */
-export function probesFor(hass: HomeAssistant, chosen?: unknown): Probe[] {
-  const devices = Array.isArray(chosen) && chosen.length ? chosen : probeDevices(hass);
-  return devices.map((device) => probeOf(hass, device)).filter((probe): probe is Probe => !!probe);
-}
-
-/** The ambient sensors to show: those chosen, in their order, or every one. */
-export function ambientsFor(hass: HomeAssistant, chosen?: unknown): Ambient[] {
-  const all = ambients(hass);
-  if (!Array.isArray(chosen) || !chosen.length) return all;
-  return chosen.map((sensor) => all.find((ambient) => ambient.sensor === sensor)).filter((a): a is Ambient => !!a);
-}
+/** The ambient sensor an entity is, if it is one. */
+export const ambientOf = (hass: HomeAssistant, entityId?: string): Ambient | undefined =>
+  entityId ? ambients(hass).find((a) => a.sensor === entityId) : undefined;
 
 const isOn = (hass: HomeAssistant, entityId?: string) => !!entityId && hass.states[entityId]?.state === "on";
+const stateOf = (hass: HomeAssistant, entityId?: string): HassEntity | undefined => (entityId ? hass.states[entityId] : undefined);
+export const valueOf = (hass: HomeAssistant, entityId?: string): number | undefined => numberOf(stateOf(hass, entityId));
 
 /** Whether a probe is on for a cook. */
 export const isActive = (hass: HomeAssistant, probe: Probe): boolean => isOn(hass, probe.entities.active);
@@ -115,57 +129,33 @@ export function statusOf(hass: HomeAssistant, probe: Probe): Status {
   if (isOn(hass, e.alarm)) return "alarm";
   if (isOn(hass, e.done)) return "done";
   if (isOn(hass, e.stalled)) return "stalled";
-  if (!known(e.progress ? hass.states[e.progress] : undefined)) return "no_reading";
+  if (internalValue(hass, probe) === undefined) return "no_reading";
   return "cooking";
 }
 
-export const STATUS_LABELS: Record<Status, string> = {
-  off: "Off", alarm: "Alarm", done: "Done", stalled: "Stalled", no_reading: "No reading", cooking: "Cooking",
-};
-
-/** The channel with the highest temperature (Max); the first of them on a tie. */
-export function maxChannel(hass: HomeAssistant, probe: Probe): string | undefined {
-  let best: string | undefined, most = -Infinity;
-  for (const id of probe.channels) {
-    const value = numberOf(hass.states[id]);
-    if (value !== undefined && value > most) [best, most] = [id, value];
-  }
-  return best;
-}
-
-/** The sensor that holds the internal temperature now: its own, or the lowest channel. */
+/** The sensor that holds the internal temperature now: its own, or the lowest channel (the reference on an RFX). */
 export function internalSensor(hass: HomeAssistant, probe: Probe): string | undefined {
   if (probe.internal) return probe.internal;
   let best: string | undefined, least = Infinity;
   for (const id of probe.channels) {
-    const value = numberOf(hass.states[id]);
+    const value = valueOf(hass, id);
     if (value !== undefined && value < least) [best, least] = [id, value];
   }
-  return best;
+  return best ?? probe.channels[0];
 }
+
+export const internalValue = (hass: HomeAssistant, probe: Probe): number | undefined => valueOf(hass, internalSensor(hass, probe));
 
 /** A probe's progress, 0 to 100; 0 without a value. */
 export function progressOf(hass: HomeAssistant, probe: Probe): number {
-  const value = numberOf(probe.entities.progress ? hass.states[probe.entities.progress] : undefined);
+  const value = valueOf(hass, probe.entities.progress);
   return value === undefined ? 0 : Math.max(0, Math.min(100, value));
 }
 
-/** A probe's colors as CSS; the theme's primary color without any. */
-export const colorsOf = (probe: Probe): string[] => (probe.colors.length ? probe.colors.map(cssColor) : ["var(--primary-color)"]);
-
-/** A swatch of colors: one color, or even stripes of each. */
-export function swatch(colors: string[]): string {
-  if (colors.length === 1) return colors[0];
-  const share = 100 / colors.length;
-  return `linear-gradient(90deg, ${colors.map((c, i) => `${c} ${i * share}% ${(i + 1) * share}%`).join(", ")})`;
-}
-
-/** A progress ring's stops: the done part in even stripes of the colors, then the track. */
-export function ringGradient(colors: string[], progress: number, track = "var(--divider-color)"): string {
-  const deg = (Math.max(0, Math.min(100, progress)) * 360) / 100;
-  const stops = colors.map((c, i) => `${c} ${(deg * i) / colors.length}deg ${(deg * (i + 1)) / colors.length}deg`);
-  return `conic-gradient(${[...stops, `${track} ${deg}deg 360deg`].join(", ")})`;
-}
+/** A probe's main color as CSS; the theme's primary color without any. */
+export const colorOf = (probe: Probe): string => (probe.colors.length ? cssColor(probe.colors[0]) : "var(--primary-color)");
+/** A probe's main color by name (for the tile card's color option). */
+export const colorNameOf = (probe: Probe): string => probe.colors[0] ?? "primary";
 
 /** Short names for a set of probes: without the words they all start with (RFX Probe Red, Blue: Red, Blue). */
 export function shortNames(names: string[]): string[] {
@@ -174,4 +164,176 @@ export function shortNames(names: string[]): string[] {
   let shared = 0;
   while (words.every((w) => w.length > shared + 1 && w[shared] === words[0][shared])) shared++;
   return words.map((w) => w.slice(shared).join(" "));
+}
+
+/** Each probe's short name, by device. */
+export function probeNames(probes: Probe[]): Map<string, string> {
+  const names = shortNames(probes.map((p) => p.name));
+  return new Map(probes.map((p, i) => [p.device, names[i]]));
+}
+
+// ---------------------------------------------------------------------------
+// What the card shows
+// ---------------------------------------------------------------------------
+
+/** A number as the card shows a temperature: whole degrees. */
+export const whole = (value: number): string => String(Math.round(value));
+
+/** A rate as the card shows it: a sign, one decimal, degrees a minute (+1.6°/min). */
+export function rateText(rate?: number): string {
+  if (rate === undefined || !Number.isFinite(rate)) return "";
+  const r = Math.round(rate * 10) / 10;
+  return `${r > 0 ? "+" : r < 0 ? "−" : ""}${Math.abs(r).toFixed(1)}°/min`;
+}
+
+/** The trend icon for a rate: rising, falling, or level within the given band. */
+export const rateIcon = (rate: number | undefined, band: number): string =>
+  rate === undefined ? "mdi:trending-neutral" : rate > band ? "mdi:trending-up" : rate < -band ? "mdi:trending-down" : "mdi:trending-neutral";
+
+/** A time span in whole minutes, short: 32 min, 1 h 10 min, 2 h. */
+export function durationText(ms: number): string {
+  const minutes = Math.max(0, Math.round(ms / 60000));
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60), m = minutes % 60;
+  return m ? `${h} h ${m} min` : `${h} h`;
+}
+
+/** A clock time in the user's language and time format: 6:42 PM, or 18:42. */
+export function clockText(date: Date, hass?: HomeAssistant): string {
+  const format = hass?.locale?.time_format;
+  const hour12 = format === "12" ? true : format === "24" ? false : undefined;
+  // Some browsers put a narrow space before AM and PM: a plain one reads the same everywhere
+  return date.toLocaleTimeString(hass?.locale?.language, { hour: "numeric", minute: "2-digit", hour12 }).replace(/ /g, " ");
+}
+
+/** When a probe will be done (its Done at sensor), or undefined. */
+export function doneAtOf(hass: HomeAssistant, probe: Probe): Date | undefined {
+  const stateObj = stateOf(hass, probe.entities.done_at);
+  if (!known(stateObj)) return undefined;
+  const date = new Date(stateObj.state);
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+/** The doneness as Home Assistant shows it (Medium rare, Custom), or undefined without a target. */
+export function donenessText(hass: HomeAssistant, probe: Probe): string | undefined {
+  if (valueOf(hass, probe.entities.target) === undefined) return undefined;
+  const stateObj = stateOf(hass, probe.entities.doneness);
+  return known(stateObj) ? hass.formatEntityState(stateObj) : undefined;
+}
+
+/** A temperature with its unit, as the target shows it (130 °F). */
+function withUnit(hass: HomeAssistant, value: number, unitFrom?: string): string {
+  const unit = stateOf(hass, unitFrom)?.attributes.unit_of_measurement;
+  return unit ? `${whole(value)} ${unit}` : `${whole(value)}°`;
+}
+
+/** Where a probe's cook stands, in words: Done at 6:42 PM, Done, Stalled, Above 150 °F, No reading, No target. */
+export function statusText(hass: HomeAssistant, probe: Probe, now = Date.now()): string {
+  const e = probe.entities;
+  const status = statusOf(hass, probe);
+  const internal = internalValue(hass, probe), target = valueOf(hass, e.target);
+  switch (status) {
+    case "off": return "Off";
+    case "no_reading": return "No reading";
+    case "alarm": {
+      const high = valueOf(hass, e.alarm_high), low = valueOf(hass, e.alarm_low);
+      if (internal !== undefined && high && internal > high) return `Above ${withUnit(hass, high, e.alarm_high)}`;
+      if (internal !== undefined && low && internal < low) return `Below ${withUnit(hass, low, e.alarm_low)}`;
+      return "Alarm";
+    }
+    case "done": {
+      const over = internal !== undefined && target !== undefined ? Math.round(internal - target) : 0;
+      return over > 2 ? `Done, ${withUnit(hass, over, e.target)} over` : "Done";
+    }
+    case "stalled": return "Stalled";
+    default: {
+      if (target === undefined) return "No target";
+      const at = doneAtOf(hass, probe);
+      return at && at.getTime() > now ? `Done at ${clockText(at, hass)}` : "Cooking";
+    }
+  }
+}
+
+/** A probe's state line: the doneness, then where the cook stands (Medium rare · Done at 6:42 PM). */
+export function probeLine(hass: HomeAssistant, probe: Probe, now = Date.now()): { doneness?: string; status: string } {
+  const status = statusText(hass, probe, now);
+  return { doneness: status === "No target" ? undefined : donenessText(hass, probe), status };
+}
+
+/** The badge a probe's icon wears: alarm, done or stalled. */
+export function badgeOf(status: Status): "alarm" | "done" | "stalled" | undefined {
+  return status === "alarm" || status === "done" || status === "stalled" ? status : undefined;
+}
+
+export interface ChannelReading {
+  id: string;
+  value?: number;
+  // 0 for the coldest channel, 1 for the hottest
+  heat: number;
+  // Degrees above the reference (the lowest), or undefined for the reference itself
+  delta?: number;
+  reference: boolean;
+  tip: boolean;
+}
+
+/**
+ * A probe's channels, from the tip: each one's heat between the coldest
+ * and the hottest, and its difference from the reference (the lowest, the
+ * internal temperature as Sous Chef reads an RFX probe).
+ */
+export function channelReadings(values: (number | undefined)[], ids: string[]): ChannelReading[] {
+  const shown = values.filter((v): v is number => v !== undefined);
+  const lo = shown.length ? Math.min(...shown) : undefined, hi = shown.length ? Math.max(...shown) : undefined;
+  const refAt = lo === undefined ? -1 : values.indexOf(lo);
+  return ids.map((id, i) => {
+    const value = values[i];
+    const reference = i === refAt;
+    return {
+      id, value, reference, tip: i === 0,
+      heat: value !== undefined && lo !== undefined && hi !== undefined && hi > lo ? (value - lo) / (hi - lo) : 0,
+      delta: value !== undefined && lo !== undefined && !reference ? Math.round(value - lo) : undefined,
+    };
+  });
+}
+
+/**
+ * The trend of readings in degrees a minute: the slope of the best line
+ * through the samples of the last few minutes; undefined with too few.
+ */
+export function trendOf(samples: [number, number][], now = Date.now(), minutes = 5): number | undefined {
+  const recent = samples.filter(([t]) => t >= now - minutes * 60000);
+  if (recent.length < 2) return undefined;
+  const n = recent.length;
+  const mt = recent.reduce((s, [t]) => s + t, 0) / n, mv = recent.reduce((s, [, v]) => s + v, 0) / n;
+  let num = 0, den = 0;
+  for (const [t, v] of recent) {
+    num += (t - mt) * (v - mv);
+    den += (t - mt) ** 2;
+  }
+  return den ? (num / den) * 60000 : undefined;
+}
+
+/** The grill's state line after its temperature: an alarm, a probe that needs a look, or how many probes are on. */
+export function grillLine(hass: HomeAssistant, ambient: Ambient | undefined, probes: Probe[]): string {
+  if (ambient && isOn(hass, ambient.alarm)) {
+    const value = valueOf(hass, ambient.sensor), high = valueOf(hass, ambient.high), low = valueOf(hass, ambient.low);
+    if (value !== undefined && high && value > high) return `Above ${withUnit(hass, high, ambient.high)}`;
+    if (value !== undefined && low && value < low) return `Below ${withUnit(hass, low, ambient.low)}`;
+    return "Alarm";
+  }
+  const names = probeNames(probes);
+  const on = probes.filter((p) => isActive(hass, p));
+  const first = (status: Status) => on.find((p) => statusOf(hass, p) === status);
+  const alarm = first("alarm"), done = first("done"), stalled = first("stalled");
+  if (alarm) return `${names.get(alarm.device)} alarm`;
+  if (done) return `${names.get(done.device)} is done`;
+  if (stalled) return `${names.get(stalled.device)} stalled`;
+  return on.length === 0 ? "No probes on" : on.length === 1 ? "1 probe on" : `${on.length} probes on`;
+}
+
+/** The grill's badge: its own alarm or a probe's, else a probe done, else one stalled. */
+export function grillBadge(hass: HomeAssistant, ambient: Ambient | undefined, probes: Probe[]): "alarm" | "done" | "stalled" | undefined {
+  if (ambient && isOn(hass, ambient.alarm)) return "alarm";
+  const statuses = probes.filter((p) => isActive(hass, p)).map((p) => statusOf(hass, p));
+  return (["alarm", "done", "stalled"] as const).find((s) => statuses.includes(s));
 }

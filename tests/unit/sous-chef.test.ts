@@ -1,118 +1,204 @@
 import { describe, expect, it } from "vitest";
-import { tileConfig, stubConfig } from "../../src/options";
+import { checkConfig, grillConfig, minimal, probeConfig, stubConfig, tileConfig } from "../../src/card/options";
 import type { HomeAssistant } from "../../src/ha";
 import {
-  ambients, ambientsFor, internalSensor, maxChannel, probeDevices, probeOf, probesFor, ringGradient, shortNames, statusOf, swatch,
+  allProbes, ambients, channelReadings, durationText, grillBadge, grillLine, internalSensor, probeDevices, probeLine, probeOf,
+  rateText, shortNames, statusOf, statusText, trendOf,
 } from "../../src/sous-chef";
 
 // A kit as Sous Chef makes it: an RFX probe (channels 1 to 4, internal = the
-// lowest), a one-sensor probe, and an ambient sensor on a gateway
-function kit(states: Record<string, string> = {}): HomeAssistant {
+// lowest), a one-sensor probe, and an ambient sensor on a gateway with its limits
+function kit(states: Record<string, string> = {}, attributes: Record<string, Record<string, unknown>> = {}): HomeAssistant {
   const entities: Record<string, any> = {};
   const all: Record<string, any> = {};
-  const add = (entity_id: string, device_id: string, translation_key: string | null, platform = "sous_chef", attributes = {}) => {
+  const add = (entity_id: string, device_id: string, translation_key: string | null, platform = "sous_chef", attrs = {}) => {
     entities[entity_id] = { entity_id, device_id, platform, translation_key };
-    all[entity_id] = { entity_id, state: states[entity_id] ?? "unknown", attributes };
+    all[entity_id] = { entity_id, state: states[entity_id] ?? "unknown", attributes: { ...attrs, ...attributes[entity_id] } };
   };
   const red = ["sensor.red_ch_1", "sensor.red_ch_2", "sensor.red_ch_3", "sensor.red_ch_4"];
-  red.forEach((id) => add(id, "red", null, "thermoworks"));
+  red.forEach((id) => add(id, "red", null, "thermoworks", { unit_of_measurement: "°F" }));
   add("switch.red_active", "red", "active");
   add("select.red_food_type", "red", "food_type");
-  add("number.red_target", "red", "target");
-  add("sensor.red_progress", "red", "progress", "sous_chef", { internal: null, channels: red, colors: ["red", "black"] });
+  add("select.red_doneness", "red", "doneness");
+  add("number.red_target", "red", "target", "sous_chef", { unit_of_measurement: "°F" });
+  add("number.red_alarm_high", "red", "alarm_high", "sous_chef", { unit_of_measurement: "°F" });
+  add("sensor.red_progress", "red", "progress", "sous_chef", { internal: null, channels: red, colors: ["red", "black"], start: 60 });
+  add("sensor.red_done_at", "red", "done_at");
   add("binary_sensor.red_done", "red", "done");
   add("binary_sensor.red_stalled", "red", "stalled");
   add("binary_sensor.red_alarm", "red", "alarm");
   add("sensor.blue_temperature", "blue", null, "other");
   add("switch.blue_active", "blue", "active");
-  add("sensor.blue_progress", "blue", "progress", "sous_chef", { internal: "sensor.blue_temperature", channels: [], colors: [] });
-  add("sensor.grill_ambient", "gateway", null, "thermoworks");
+  add("sensor.blue_progress", "blue", "progress", "sous_chef", { internal: "sensor.blue_temperature", channels: [], colors: ["blue"] });
+  add("sensor.grill_ambient", "gateway", null, "thermoworks", { unit_of_measurement: "°F" });
   add("binary_sensor.grill_ambient_alarm", "gateway", "alarm", "sous_chef", { sensor: "sensor.grill_ambient" });
+  add("number.grill_alarm_low", "gateway", "alarm_low", "sous_chef", { unit_of_measurement: "°F" });
+  add("number.grill_alarm_high", "gateway", "alarm_high", "sous_chef", { unit_of_measurement: "°F" });
   return {
     states: all,
     entities,
     devices: { red: { id: "red", name: "RFX Probe Red" }, blue: { id: "blue", name: "RFX Probe Blue", name_by_user: null } },
+    locale: { language: "en-US", time_format: "12" },
     callService: async () => undefined,
     callWS: async () => undefined as never,
     loadBackendTranslation: async () => (key: string) => key,
-    formatEntityState: (s) => s.state,
+    formatEntityState: (s, state) => {
+      const v = state ?? s.state;
+      return s.attributes.unit_of_measurement ? `${v} ${s.attributes.unit_of_measurement}` : v === "medium_rare" ? "Medium rare" : v;
+    },
   };
 }
+
+const RED_ON = {
+  "switch.red_active": "on", "sensor.red_ch_1": "88", "sensor.red_ch_2": "93", "sensor.red_ch_3": "97", "sensor.red_ch_4": "104",
+  "number.red_target": "130", "select.red_doneness": "medium_rare",
+};
 
 describe("finding the entities (registry: platform, device, translation key)", () => {
   it("lists the probes by their Active switch", () => expect(probeDevices(kit())).toEqual(["red", "blue"]));
   it("finds a probe's entities and what its Progress tells", () => {
     const red = probeOf(kit(), "red")!;
     expect(red.name).toBe("RFX Probe Red");
-    expect(red.entities.active).toBe("switch.red_active");
     expect(red.entities.alarm).toBe("binary_sensor.red_alarm");
+    expect(red.entities.alarm_high).toBe("number.red_alarm_high");
     expect(red.channels).toHaveLength(4);
-    expect(red.internal).toBeNull();
     expect(red.colors).toEqual(["red", "black"]);
+    expect(red.start).toBe(60);
   });
   it("finds no probe on a device without Sous Chef", () => expect(probeOf(kit(), "gateway")).toBeUndefined());
-  it("finds an ambient sensor through its Alarm's sensor attribute", () =>
-    expect(ambients(kit())).toEqual([{ sensor: "sensor.grill_ambient", alarm: "binary_sensor.grill_ambient_alarm" }]));
-  it("keeps the order chosen, and shows every one when none is chosen", () => {
-    expect(probesFor(kit(), ["blue", "red"]).map((p) => p.device)).toEqual(["blue", "red"]);
-    expect(probesFor(kit(), []).map((p) => p.device)).toEqual(["red", "blue"]);
-    expect(ambientsFor(kit(), ["sensor.missing"])).toEqual([]);
-  });
+  it("finds an ambient sensor through its Alarm, with the limits on its device", () =>
+    expect(ambients(kit())).toEqual([{
+      sensor: "sensor.grill_ambient", alarm: "binary_sensor.grill_ambient_alarm", low: "number.grill_alarm_low", high: "number.grill_alarm_high",
+    }]));
 });
 
 describe("a probe's readings", () => {
-  const hass = kit({ "sensor.red_ch_1": "91", "sensor.red_ch_2": "88", "sensor.red_ch_3": "94", "sensor.red_ch_4": "103" });
-  const red = probeOf(hass, "red")!;
-  it("Max is the highest channel", () => expect(maxChannel(hass, red)).toBe("sensor.red_ch_4"));
+  const hass = kit(RED_ON);
   it("the internal temperature is the lowest channel without its own sensor", () =>
-    expect(internalSensor(hass, red)).toBe("sensor.red_ch_2"));
+    expect(internalSensor(hass, probeOf(hass, "red")!)).toBe("sensor.red_ch_1"));
   it("a one-sensor probe's internal temperature is that sensor", () =>
     expect(internalSensor(hass, probeOf(hass, "blue")!)).toBe("sensor.blue_temperature"));
+  it("each channel against the reference: the coldest faintest, the hottest strongest", () => {
+    const ch = channelReadings([88, 93, 97, 104], ["a", "b", "c", "d"]);
+    expect(ch.map((c) => c.delta)).toEqual([undefined, 5, 9, 16]);
+    expect(ch[0].reference && ch[0].tip).toBe(true);
+    expect(ch.map((c) => c.heat)).toEqual([0, 5 / 16, 9 / 16, 1]);
+  });
+  it("the reference need not be the tip", () => {
+    const ch = channelReadings([96, 91, 99], ["a", "b", "c"]);
+    expect(ch.map((c) => c.reference)).toEqual([false, true, false]);
+    expect(ch[0].delta).toBe(5);
+  });
+  it("no reading: no values, no reference", () =>
+    expect(channelReadings([undefined, undefined], ["a", "b"]).every((c) => c.delta === undefined && !c.reference)).toBe(true));
 });
 
 describe("where a cook stands", () => {
   const status = (states: Record<string, string>) => statusOf(kit(states), probeOf(kit(states), "red")!);
   it("off while the switch is off", () => expect(status({ "switch.red_active": "off" })).toBe("off"));
-  it("no reading while Progress has no value", () => expect(status({ "switch.red_active": "on" })).toBe("no_reading"));
-  it("cooking with a value", () => expect(status({ "switch.red_active": "on", "sensor.red_progress": "62" })).toBe("cooking"));
+  it("no reading without a value", () => expect(status({ "switch.red_active": "on" })).toBe("no_reading"));
+  it("cooking with a value", () => expect(status(RED_ON)).toBe("cooking"));
   it("alarm before done before stalled", () => {
-    const on = { "switch.red_active": "on", "sensor.red_progress": "99" };
-    expect(status({ ...on, "binary_sensor.red_stalled": "on", "binary_sensor.red_done": "on", "binary_sensor.red_alarm": "on" })).toBe("alarm");
-    expect(status({ ...on, "binary_sensor.red_stalled": "on", "binary_sensor.red_done": "on" })).toBe("done");
-    expect(status({ ...on, "binary_sensor.red_stalled": "on" })).toBe("stalled");
+    expect(status({ ...RED_ON, "binary_sensor.red_stalled": "on", "binary_sensor.red_done": "on", "binary_sensor.red_alarm": "on" })).toBe("alarm");
+    expect(status({ ...RED_ON, "binary_sensor.red_stalled": "on", "binary_sensor.red_done": "on" })).toBe("done");
+    expect(status({ ...RED_ON, "binary_sensor.red_stalled": "on" })).toBe("stalled");
   });
 });
 
-describe("colors", () => {
-  it("a ring stripes the done part evenly in each color", () =>
-    expect(ringGradient(["red", "black"], 50, "grey")).toBe("conic-gradient(red 0deg 90deg, black 90deg 180deg, grey 180deg 360deg)"));
-  it("a swatch of one color is that color, of several even stripes", () => {
-    expect(swatch(["red"])).toBe("red");
-    expect(swatch(["red", "black"])).toBe("linear-gradient(90deg, red 0% 50%, black 50% 100%)");
+describe("the state lines", () => {
+  const now = Date.parse("2026-11-22T18:10:00");
+  const line = (states: Record<string, string>) => {
+    const hass = kit(states);
+    return probeLine(hass, probeOf(hass, "red")!, now);
+  };
+  it("a probe: its doneness, then when it will be done", () =>
+    expect(line({ ...RED_ON, "sensor.red_done_at": "2026-11-22T18:42:00" })).toEqual({ doneness: "Medium rare", status: "Done at 6:42 PM" }));
+  it("no target: only that", () => expect(line({ ...RED_ON, "number.red_target": "unknown" })).toEqual({ doneness: undefined, status: "No target" }));
+  it("done, and how far over", () => {
+    expect(line({ ...RED_ON, "binary_sensor.red_done": "on", "sensor.red_ch_1": "131" }).status).toBe("Done");
+    const over = { "sensor.red_ch_1": "138", "sensor.red_ch_2": "141", "sensor.red_ch_3": "144", "sensor.red_ch_4": "149" };
+    expect(line({ ...RED_ON, ...over, "binary_sensor.red_done": "on" }).status).toBe("Done, 8 °F over");
+  });
+  it("an alarm says which limit", () => {
+    const hass = kit({ ...RED_ON, "binary_sensor.red_alarm": "on", "number.red_alarm_high": "80" });
+    expect(statusText(hass, probeOf(hass, "red")!, now)).toBe("Above 80 °F");
+  });
+  it("the grill: how many probes are on, then a probe that needs a look, then its own alarm", () => {
+    const amb = (s: Record<string, string>) => {
+      const hass = kit(s);
+      return grillLine(hass, ambients(hass)[0], allProbes(hass));
+    };
+    expect(amb({})).toBe("No probes on");
+    expect(amb(RED_ON)).toBe("1 probe on");
+    expect(amb({ ...RED_ON, "switch.blue_active": "on" })).toBe("2 probes on");
+    expect(amb({ ...RED_ON, "binary_sensor.red_done": "on" })).toBe("Red is done");
+    expect(amb({ ...RED_ON, "binary_sensor.grill_ambient_alarm": "on", "sensor.grill_ambient": "198", "number.grill_alarm_low": "225" }))
+      .toBe("Below 225 °F");
+  });
+  it("the grill's badge", () => {
+    const hass = kit({ ...RED_ON, "binary_sensor.red_stalled": "on" });
+    expect(grillBadge(hass, ambients(hass)[0], allProbes(hass))).toBe("stalled");
+  });
+});
+
+describe("numbers as the card shows them", () => {
+  it("a rate, signed, to one decimal", () => {
+    expect(rateText(1.62)).toBe("+1.6°/min");
+    expect(rateText(-2.4)).toBe("−2.4°/min");
+    expect(rateText(0)).toBe("0.0°/min");
+    expect(rateText(undefined)).toBe("");
+  });
+  it("a time left, short", () => {
+    expect(durationText(32 * 60000)).toBe("32 min");
+    expect(durationText(70 * 60000)).toBe("1 h 10 min");
+    expect(durationText(120 * 60000)).toBe("2 h");
+  });
+  it("a trend: degrees a minute over the last five minutes", () => {
+    const now = 10 * 60000;
+    const samples: [number, number][] = [[now - 4 * 60000, 200], [now - 2 * 60000, 204], [now, 208]];
+    expect(trendOf(samples, now)).toBeCloseTo(2);
+    expect(trendOf([[now, 1]], now)).toBeUndefined();
   });
 });
 
 describe("names", () => {
-  it("drops the words every probe starts with", () =>
-    expect(shortNames(["RFX Probe Red", "RFX Probe Blue"])).toEqual(["Red", "Blue"]));
-  it("always keeps at least one word", () =>
-    expect(shortNames(["RFX Probe", "RFX Probe Blue"])).toEqual(["Probe", "Probe Blue"]));
+  it("drops the words every probe starts with", () => expect(shortNames(["RFX Probe Red", "RFX Probe Blue"])).toEqual(["Red", "Blue"]));
+  it("always keeps at least one word", () => expect(shortNames(["RFX Probe", "RFX Probe Blue"])).toEqual(["Probe", "Probe Blue"]));
 });
 
-describe("the card", () => {
-  it("hands its probes and ambient sensors to its own features only", () => {
-    const tile = tileConfig({
-      type: "custom:sous-chef-card", entity: "sensor.grill_ambient", probes: ["red"], ambient: ["sensor.grill_ambient"],
-      features: [{ type: "custom:sous-chef-probes" }, { type: "fan-speed" }],
-    });
-    expect(tile.type).toBe("tile");
-    expect(tile.probes).toBeUndefined();
-    expect(tile.features[0]).toEqual({ type: "custom:sous-chef-probes", probes: ["red"], ambient: ["sensor.grill_ambient"], time_format: "time" });
-    expect(tile.features[1]).toEqual({ type: "fan-speed" });
+describe("the card's options", () => {
+  const card = { type: "custom:sous-chef-card", entity: "sensor.grill_ambient" };
+  it("needs a grill", () => expect(() => checkConfig({ type: "custom:sous-chef-card" })).toThrow(/Choose a grill/));
+  it("refuses an unknown option of its own, and an unknown value", () => {
+    expect(() => checkConfig({ ...card, finish: "x", style_x: 1 })).toThrow(/Unknown option: style_x/);
+    expect(() => checkConfig({ ...card, style: "chrome" })).toThrow(/Unknown style/);
+    expect(() => checkConfig({ ...card, probe_list: [] })).toThrow(/Unknown option/);
   });
-  it("a new card is a grill when there is an ambient sensor", () => {
+  it("leaves out options at their defaults", () =>
+    expect(minimal({ ...card, style: "none", grill_icon: "bull", features_style: "match", probes_toggle: true })).toEqual({ ...card, grill_icon: "bull" }));
+  it("hands the tile card only its own options", () => {
+    const tile = tileConfig({ ...card, style: "black", features_style: "console" });
+    expect(tile).toEqual({ type: "tile", entity: "sensor.grill_ambient" });
+  });
+  it("the grill: a tap shows or hides the probes, and a brand's mark is its picture", () => {
+    expect(grillConfig(card).tap_action).toEqual({ action: "fire-dom-event", sous_chef_card: "toggle" });
+    expect(grillConfig({ ...card, probes_toggle: false }).tap_action).toBeUndefined();
+    expect(grillConfig({ ...card, grill_icon: "weber" }).show_entity_picture).toBe(true);
+    expect(grillConfig(card).show_entity_picture).toBeUndefined();
+  });
+  it("a probe's tile: its food type in its color, with its features", () => {
+    const tile = probeConfig(probeOf(kit(), "red")!, "Red");
+    expect(tile.entity).toBe("select.red_food_type");
+    expect(tile.color).toBe("red");
+    expect(tile.state_content).toEqual(["doneness", "status"]);
+    expect(tile.features.map((f: any) => f.type)).toEqual([
+      "custom:sous-chef-progress", "custom:sous-chef-cook", "custom:sous-chef-channels", "custom:sous-chef-timing",
+    ]);
+  });
+  it("a new card: the first grill, with the probes beside its name", () => {
     const stub = stubConfig(kit());
     expect(stub.entity).toBe("sensor.grill_ambient");
-    expect(stub.features.map((f: any) => f.type)).toEqual(["custom:sous-chef-ambient", "custom:sous-chef-probes"]);
+    expect(stub.features_position).toBe("inline");
+    expect(stub.features[0].type).toBe("custom:sous-chef-probes");
   });
 });

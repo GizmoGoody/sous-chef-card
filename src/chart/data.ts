@@ -17,6 +17,8 @@ export interface ChartFood {
   key: string;
   icon?: string | null;
   levels: ChartLevel[];
+  // The government's safe minimum for the food, for Home Assistant's country (when Sous Chef gives one)
+  safe_minimum?: { f: number; c: number } | null;
 }
 
 export interface ChartSource {
@@ -46,7 +48,7 @@ export function labelOf(localize: Localize | undefined, select: "source" | "food
 }
 
 /** A level's temperature in the probe's unit (°F or °C), as the chart gives it. */
-export const temperatureOf = (level: ChartLevel, unit?: string): number => (unit === "°C" ? level.c : level.f);
+export const temperatureOf = (level: { f: number; c: number }, unit?: string): number => (unit === "°C" ? level.c : level.f);
 
 /** The rest or hold time a level asks for, as text. */
 export function timesOf(level: ChartLevel): string {
