@@ -164,6 +164,7 @@ export class SousChefCard extends LitElement {
       solid: !!finish && features !== "match",
     })} style=${styleMap(style)} @ll-custom=${this._toggle}>
       ${this._grill ?? nothing}
+      ${finish?.handle ? html`<div class="handle" aria-hidden="true"><span class="post"></span><span class="bar"></span><span class="post"></span></div>` : nothing}
       <div class="probes">${tiles}</div>
     </div>`;
   }

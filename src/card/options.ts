@@ -3,7 +3,7 @@
 // grill's, and each probe's). Pure, so the unit tests can check them.
 import { FEATURES_STYLES, GRILL_FEATURES, ICONS, PROBE_FEATURES, STYLES } from "../const";
 import type { Config, HomeAssistant } from "../ha";
-import { ambients, colorNameOf, type Probe } from "../sous-chef";
+import { ambients, tileColorOf, type Probe } from "../sous-chef";
 
 // Options this card adds to the tile card's
 export const OWN_KEYS = ["style", "grill_icon", "features_style", "probes_toggle"];
@@ -68,7 +68,7 @@ export function probeConfig(probe: Probe, name: string): Config {
     type: "tile",
     entity: probe.entities.food_type ?? probe.entities.active,
     name,
-    color: colorNameOf(probe),
+    color: tileColorOf(probe),
     state_content: ["doneness", "status"],
     features: PROBE_FEATURES.map((type) => ({ type: `custom:${type}` })),
     features_position: "bottom",

@@ -146,9 +146,11 @@ export class SousChefField extends LitElement {
     this._typing();
   }
 
-  // Empty: the placeholder alone, centered
+  // Empty: the placeholder alone, across the field; otherwise as wide as the number
   private _typing = () => {
-    this.classList.toggle("unset", !this._input?.value);
+    const value = this._input?.value ?? "";
+    this.classList.toggle("unset", !value);
+    this.style.setProperty("--len", String(Math.max(value.length, 1)));
   };
 
   private _key = (ev: KeyboardEvent) => {

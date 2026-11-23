@@ -41,14 +41,15 @@ export const featureStyles = [rowStyles, css`
   }
   .field::before { content: ""; position: absolute; inset: 0; background: var(--c, ${enabled}); opacity: .2; }
   .field > * { position: relative; }
+  /* The number as wide as its digits (--len, set as it is typed), so it and its degree sign sit centered together */
   .field input {
-    flex: 1 1 0; width: 0; min-width: 0; margin: 0; padding: 0; border: 0; outline: none; background: transparent;
-    font: inherit; color: inherit; text-align: right; font-variant-numeric: tabular-nums;
+    flex: 0 1 auto; width: calc(var(--len, 1) * 1ch); min-width: 0; margin: 0; padding: 0; border: 0; outline: none; background: transparent;
+    font: inherit; color: inherit; text-align: center; font-variant-numeric: tabular-nums;
   }
-  .field .unit { flex: 1 1 0; min-width: 0; text-align: left; opacity: .8; white-space: nowrap; }
-  .field ha-icon, .field ha-state-icon { flex: none; --mdc-icon-size: 22px; margin-right: 4px; color: var(--c, ${enabled}); }
+  .field .unit { flex: none; white-space: nowrap; }
+  .field ha-icon, .field ha-state-icon { flex: none; --mdc-icon-size: 22px; margin-right: 4px; color: var(--c-icon, var(--c, ${enabled})); }
   /* Empty: the placeholder alone, centered (TARGET, OFF) */
-  .field.unset input { text-align: center; }
+  .field.unset input { flex: 1 1 auto; width: 100%; }
   .field.unset .unit { display: none; }
   .field input::placeholder { color: var(--secondary-text-color); font-size: 10px; font-weight: 400; text-transform: uppercase; letter-spacing: .03em; opacity: 1; }
   .field.disabled { cursor: default; color: var(--disabled-text-color, #bdbdbd); }
@@ -66,7 +67,6 @@ export const featureStyles = [rowStyles, css`
   /* A field with a list (the doneness): the browser's own list, over the whole field */
   .field.menu { cursor: pointer; gap: 2px; }
   .note { font-size: 10px; font-weight: 400; color: var(--secondary-text-color); text-transform: uppercase; letter-spacing: .03em; }
-  .arrow { --mdc-icon-size: 18px; margin: 0 -4px 0 -2px; color: var(--secondary-text-color) !important; }
   .num { font-variant-numeric: tabular-nums; }
   .key {
     min-width: 0; height: 100%; padding: 0 4px; border: 0; cursor: pointer; box-sizing: border-box;
@@ -85,7 +85,7 @@ export const featureStyles = [rowStyles, css`
   .key:disabled, .key.disabled { cursor: default; color: var(--disabled-text-color, #bdbdbd); }
   .key:disabled::before, .key:disabled:hover::before, .key.disabled::before { background: var(--disabled-color, #bdbdbd); opacity: .2; }
   .key > * { position: relative; }
-  .key ha-icon, .key ha-state-icon { flex: none; --mdc-icon-size: 22px; color: var(--c, ${enabled}); }
+  .key ha-icon, .key ha-state-icon { flex: none; --mdc-icon-size: 22px; color: var(--c-icon, var(--c, ${enabled})); }
   .key[aria-pressed="true"] ha-icon, .key[aria-pressed="true"] ha-state-icon { color: inherit; }
   /* A key or field that opens a list: the browser's own list, over the whole of it */
   .key select, .field select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font: inherit; }

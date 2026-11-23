@@ -7,7 +7,7 @@ import { styleMap } from "lit/directives/style-map.js";
 import { FEATURES, GRILL_COLOR } from "../const";
 import { cssColor, darkMode, dim, entityName, findDeep, moreInfo, numberOf, toHex, type Config, type HomeAssistant } from "../ha";
 import {
-  allProbes, axisRange, colorOf, cookBar, doneAtOf, internalSensor, internalValue, isActive, probeNames, rateIcon, rateText, statusOf, trendOf,
+  allProbes, axisRange, colorOf, cookBar, iconColorOf, doneAtOf, internalSensor, internalValue, isActive, probeNames, rateIcon, rateText, statusOf, trendOf,
   valueOf, whole, type Probe,
 } from "../sous-chef";
 import { readout, SousChefFeature } from "./base";
@@ -33,7 +33,9 @@ export class SousChefProbes extends SousChefFeature {
   }];
 
   static override styles = [featureStyles, css`
-    .key { font-size: var(--ha-font-size-m, 14px); }
+    .key { font-size: var(--ha-font-size-m, 14px); container-type: inline-size; }
+    /* Crowded: the number alone */
+    @container (max-width: 34px) { .deg { display: none; } }
   `];
 
   protected override watched(): string[] {
@@ -55,10 +57,10 @@ export class SousChefProbes extends SousChefFeature {
         const t = on && temperatures && statusOf(hass, p) !== "no_reading" ? internalValue(hass, p) : undefined;
         const title = `${names.get(p.device)}: ${on ? `on${t !== undefined ? `, ${whole(t)}°` : ""}` : "off. Take it off its charger, or tap to turn it on"}`;
         return html`<button type="button" class="key" data-min=${ITEM_MIN.key} aria-pressed=${on ? "true" : "false"} title=${title} aria-label=${title}
-          style=${styleMap({ "--c": colorOf(p), "--sc-on-color": p.colors[0] === "yellow" || p.colors[0] === "white" ? "rgba(0,0,0,.85)" : "#fff" })}
+          style=${styleMap({ "--c": colorOf(p), "--c-icon": iconColorOf(p), "--sc-on-color": p.colors[0] === "yellow" || p.colors[0] === "white" ? "rgba(0,0,0,.85)" : "#fff" })}
           ?disabled=${hass.states[p.entities.active!]?.state === "unavailable"}
           @click=${() => this.call("switch", on ? "turn_off" : "turn_on", { entity_id: p.entities.active })}>
-          ${t === undefined ? html`<ha-icon icon="mdi:thermometer-probe"></ha-icon>` : html`<span class="num">${whole(t)}°</span>`}
+          ${t === undefined ? html`<ha-icon icon="mdi:thermometer-probe"></ha-icon>` : html`<span class="num">${whole(t)}<span class="deg">°</span></span>`}
         </button>`;
       })}
     </div>`;
@@ -468,7 +470,7 @@ export class SousChefProgressBars extends SousChefFeature {
   static override pickerName = "Sous Chef progress";
   static override forKind = "grill" as const;
   static override options = [
-    { name: "readings", label: "Readings", helper: "Each probe's temperature and target over its bar", default: true, selector: { boolean: {} } },
+    { name: "values", label: "Values", helper: "Each probe's temperature and target over its bar, the bars side by side. Off: the bars stacked, each across the card.", default: true, selector: { boolean: {} } },
   ];
 
   static override styles = [featureStyles, css`
@@ -482,6 +484,8 @@ export class SousChefProgressBars extends SousChefFeature {
     .fill.stalled { background: repeating-linear-gradient(135deg, rgba(255,255,255,.4) 0 4px, transparent 4px 8px), var(--c); }
     .goal { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: rgba(0,0,0,.6); }
     .reading { font-size: var(--ha-font-size-s, 12px); font-weight: 500; text-align: center; }
+    /* Stacked: thin bars one above another, each across the card */
+    .bars.stacked { grid-auto-rows: auto; row-gap: 8px; align-content: center; min-height: var(--feature-height, 42px); }
     :host([sc-console]) .bar { box-shadow: inset 0 1px 2px rgba(0,0,0,.45); }
     @media (prefers-reduced-motion: reduce) { .fill { transition: none; } }
   `];
@@ -497,8 +501,9 @@ export class SousChefProgressBars extends SousChefFeature {
     this.showNothing(!on.length);
     if (!on.length) return nothing;
     const names = probeNames(on);
-    const readings = this.option<boolean>("readings") !== false;
-    return html`<div class="bars" style=${styleMap({ "--columns": String(Math.ceil(on.length / Math.ceil(on.length / BARS_PER_ROW))) })}>
+    const readings = this.option<boolean>("values") !== false;
+    const columns = readings ? Math.ceil(on.length / Math.ceil(on.length / BARS_PER_ROW)) : 1;
+    return html`<div class="bars ${readings ? "" : "stacked"}" style=${styleMap({ "--columns": String(columns) })}>
       ${on.map((p) => {
         const bar = cookBar(hass, p);
         const title = `${names.get(p.device)}: ${bar.label || "no reading"}`;

@@ -9,7 +9,7 @@ import { showChartDialog } from "../chart/dialog";
 import { FEATURES } from "../const";
 import { known, moreInfo, type HassEntity } from "../ha";
 import {
-  channelReadings, colorOf, cookBar, CUSTOM, doneAtOf, durationText, internalSensor, rateIcon, rateText,
+  channelReadings, colorOf, cookBar, iconColorOf, CUSTOM, doneAtOf, durationText, internalSensor, rateIcon, rateText,
   statusOf, valueOf, whole,
 } from "../sous-chef";
 import { readout, SousChefFeature } from "./base";
@@ -33,7 +33,7 @@ export class SousChefProgress extends SousChefFeature {
     .fill.stalled { background: repeating-linear-gradient(135deg, rgba(255,255,255,.35) 0 6px, transparent 6px 12px), var(--c); }
     .goal { position: absolute; top: 8px; bottom: 8px; width: 3px; margin-left: -1px; border-radius: 2px; background: rgba(0,0,0,.55); }
     .label {
-      position: absolute; inset: 0; display: flex; align-items: center; padding: 0 16px; font-size: var(--ha-font-size-m, 14px);
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 0 12px; font-size: var(--ha-font-size-m, 14px);
       font-weight: 500; text-shadow: 0 1px 2px rgba(0,0,0,.6); color: #fff;
     }
     :host([sc-console]) .bar { box-shadow: inset 0 2px 4px rgba(0,0,0,.45), inset 0 -1px 0 rgba(255,255,255,.18); }
@@ -102,14 +102,13 @@ export class SousChefCook extends SousChefFeature {
     const chosen = this.chosen();
     const controls: Record<string, () => unknown> = {
       food: () => food ? html`<label class="key" data-min=${ITEM_MIN.key} title="Food type: ${foodName}">
-        <ha-state-icon .hass=${hass} .stateObj=${food}></ha-state-icon><ha-icon class="arrow" icon="mdi:menu-down"></ha-icon>
+        <ha-state-icon .hass=${hass} .stateObj=${food}></ha-state-icon>
         ${this._menu(e.food_type, food, "Food type")}
       </label>` : nothing,
       target: () => custom
         ? numberField(hass, e.target, { placeholder: "Target", title: "Target: type it in" })
         : html`<label class="field menu" data-min=${ITEM_MIN.field} title="Doneness: ${level}${target !== undefined ? `, ${whole(target)}°` : ""}">
             ${target !== undefined ? html`<span class="num">${whole(target)}°</span>` : html`<span class="note">Target</span>`}
-            <ha-icon class="arrow" icon="mdi:menu-down"></ha-icon>
             ${this._menu(e.doneness, doneness, "Doneness")}
           </label>`,
       chart: () => html`<button type="button" class="key" data-min=${ITEM_MIN.key} title="Chart view: pick from a chart" aria-label="Chart view"
@@ -118,7 +117,7 @@ export class SousChefCook extends SousChefFeature {
         <ha-icon icon="mdi:book-open-variant"></ha-icon>
       </button>`,
     };
-    return html`<div class="row" style=${styleMap({ "--c": colorOf(probe) })}>${chosen.map((id) => controls[id]())}</div>`;
+    return html`<div class="row" style=${styleMap({ "--c": colorOf(probe), "--c-icon": iconColorOf(probe) })}>${chosen.map((id) => controls[id]())}</div>`;
   }
 }
 
@@ -152,8 +151,7 @@ export class SousChefChannels extends SousChefFeature {
     const unit = hass.states[probe.channels[0]]?.attributes.unit_of_measurement ?? "°";
     const deltas = this.option<boolean>("deltas") !== false;
     const channels = channelReadings(probe.channels.map((id) => (reading ? valueOf(hass, id) : undefined)), probe.channels);
-    // The row wraps rather than leaving a channel out
-    return html`<div class="row wraps" style=${styleMap({ "--c": colorOf(probe) })}>
+    return html`<div class="row" style=${styleMap({ "--c": colorOf(probe) })}>
       ${channels.map((ch, i) => {
         const title = `Channel ${i + 1}${ch.tip ? ", at the tip" : ""}: ${ch.value === undefined ? "unknown"
           : `${whole(ch.value)} ${unit}${ch.reference ? ", the reference" : `, ${ch.delta} ${unit} above the reference`}`}`;
@@ -166,8 +164,8 @@ export class SousChefChannels extends SousChefFeature {
   }
 }
 
-// A channel's read-out holds a short number over its difference: narrower than a read-out of words
-const CHANNEL_MIN = 44;
+// A channel's read-out holds a short number over its difference: as narrow as a key, so four fit in half the card
+const CHANNEL_MIN = 36;
 
 /** The rate, and the time left; once done, the rest the chart asks for. */
 export class SousChefTiming extends SousChefFeature {
@@ -208,7 +206,7 @@ export class SousChefTiming extends SousChefFeature {
       time: () => readout(timeTitle, () => moreInfo(this, done ? e.doneness : e.done_at),
         html`<ha-icon .icon=${done ? "mdi:timer-sand" : "mdi:timer-outline"}></ha-icon>${left ? html`<span>${left}</span>` : done ? html`<span class="note">Done</span>` : nothing}`),
     };
-    return html`<div class="row" style=${styleMap({ "--c": colorOf(probe) })}>${this.chosen().map((id) => controls[id]())}</div>`;
+    return html`<div class="row" style=${styleMap({ "--c": colorOf(probe), "--c-icon": iconColorOf(probe) })}>${this.chosen().map((id) => controls[id]())}</div>`;
   }
 
   // The internal temperature changes the rate and time left

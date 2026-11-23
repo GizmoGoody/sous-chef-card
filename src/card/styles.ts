@@ -38,6 +38,18 @@ export const cardStyles = css`
   /* Flat and Console: each control on a plain patch of the finish */
   .solid { --sc-backing: var(--sc-base); }
   .probes { display: grid; }
+  /* Bull's handle, under the grill (below its title row when folded): a polished chrome bar on two posts, as on its hood */
+  .handle { position: relative; display: flex; align-items: center; height: 16px; margin: -4px 12% 10px; pointer-events: none; }
+  .handle .bar {
+    flex: 1; height: 9px; margin: 0 -6px; border-radius: 5px;
+    background: linear-gradient(180deg, #5f666d 0%, #e9edf0 22%, #ffffff 38%, #c2c8cd 55%, #f7f9fa 72%, #8a9198 90%, #4f565c 100%);
+    box-shadow: 0 3px 4px rgba(0,0,0,.35);
+  }
+  .handle .post {
+    position: relative; z-index: 1; width: 30px; height: 16px; border-radius: 8px 8px 6px 6px;
+    background: linear-gradient(180deg, #6b7279 0%, #f2f4f6 25%, #ffffff 40%, #b5bbc1 62%, #e6e9ec 80%, #5d646a 100%);
+    box-shadow: 0 3px 4px rgba(0,0,0,.4), inset 0 0 0 1px rgba(0,0,0,.18);
+  }
   .panel:not(.open) .probes { display: none; }
 `;
 

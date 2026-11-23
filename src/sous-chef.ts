@@ -157,6 +157,13 @@ export const colorOf = (probe: Probe): string => (probe.colors.length ? cssColor
 /** A probe's main color by name (for the tile card's color option). */
 export const colorNameOf = (probe: Probe): string => probe.colors[0] ?? "primary";
 
+// The light probe colors, darker for an icon on their own tint (a green icon on a green key)
+const ICON_COLORS: Record<string, string> = { green: "#2e7d32", "light-green": "#558b2f", lime: "#827717", yellow: "#9a7b00", amber: "#a35f00", white: "#616161" };
+/** A probe's icon color: its color, darker where its color is light. */
+export const iconColorOf = (probe: Probe): string => ICON_COLORS[probe.colors[0] ?? ""] ?? colorOf(probe);
+/** The color name or hex Home Assistant's tile card takes for a probe: darker where the probe's color is light. */
+export const tileColorOf = (probe: Probe): string => ICON_COLORS[probe.colors[0] ?? ""] ?? colorNameOf(probe);
+
 /** Short names for a set of probes: without the words they all start with (RFX Probe Red, Blue: Red, Blue). */
 export function shortNames(names: string[]): string[] {
   if (names.length < 2) return names;
@@ -227,7 +234,7 @@ function withUnit(hass: HomeAssistant, value: number, unitFrom?: string): string
   return unit ? `${whole(value)} ${unit}` : `${whole(value)}°`;
 }
 
-/** Where a probe's cook stands, in words: Done at 6:42 PM, Done, Stalled, Above 150 °F, No reading, No target. */
+/** Where a probe's cook stands, in words: Done at 6:42 PM, Done, Stalled, Above 150 °F, No reading; nothing without a target. */
 export function statusText(hass: HomeAssistant, probe: Probe, now = Date.now()): string {
   const e = probe.entities;
   const status = statusOf(hass, probe);
@@ -247,7 +254,7 @@ export function statusText(hass: HomeAssistant, probe: Probe, now = Date.now()):
     }
     case "stalled": return "Stalled";
     default: {
-      if (target === undefined) return "No target";
+      if (target === undefined) return "";
       const at = doneAtOf(hass, probe);
       return at && at.getTime() > now ? `Done at ${clockText(at, hass)}` : "Cooking";
     }
@@ -257,7 +264,8 @@ export function statusText(hass: HomeAssistant, probe: Probe, now = Date.now()):
 /** A probe's state line: the doneness, then where the cook stands (Medium rare · Done at 6:42 PM). */
 export function probeLine(hass: HomeAssistant, probe: Probe, now = Date.now()): { doneness?: string; status: string } {
   const status = statusText(hass, probe, now);
-  return { doneness: status === "No target" ? undefined : donenessText(hass, probe), status };
+  const target = valueOf(hass, probe.entities.target);
+  return { doneness: target === undefined && status === "" ? undefined : donenessText(hass, probe), status };
 }
 
 /** The badge a probe's icon wears: alarm, done or stalled. */

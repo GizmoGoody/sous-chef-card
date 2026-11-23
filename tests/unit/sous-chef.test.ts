@@ -116,7 +116,7 @@ describe("the state lines", () => {
   };
   it("a probe: its doneness, then when it will be done", () =>
     expect(line({ ...RED_ON, "sensor.red_done_at": "2026-11-22T18:42:00" })).toEqual({ doneness: "Medium rare", status: "Done at 6:42 PM" }));
-  it("no target: only that", () => expect(line({ ...RED_ON, "number.red_target": "unknown" })).toEqual({ doneness: undefined, status: "No target" }));
+  it("no target: nothing (the target field says it)", () => expect(line({ ...RED_ON, "number.red_target": "unknown" })).toEqual({ doneness: undefined, status: "" }));
   it("done, and how far over", () => {
     expect(line({ ...RED_ON, "binary_sensor.red_done": "on", "sensor.red_ch_1": "131" }).status).toBe("Done");
     const over = { "sensor.red_ch_1": "138", "sensor.red_ch_2": "141", "sensor.red_ch_3": "144", "sensor.red_ch_4": "149" };
