@@ -51,6 +51,17 @@ export const defaultProbeFeatures = (): Config[] => PROBE_FEATURES.map((type) =>
 export const probeFeaturesOf = (feature?: Config): Config[] =>
   Array.isArray(feature?.features) ? feature!.features : defaultProbeFeatures();
 
+// A probe tile's lines by default: its name on top; its food, doneness and status below
+export const PROBE_TOP = ["name"];
+export const PROBE_BOTTOM = ["state", "doneness", "status"];
+
+/** A probe tile's lines, as chosen in Sous Chef probes: the name (blank: the probe's), the top line and the bottom line. */
+export function probeLinesOf(feature?: Config): { name?: string; top: string[]; bottom: string[] } {
+  const list = (value: unknown, fallback: string[]) => (Array.isArray(value) ? value : typeof value === "string" && value ? [value] : fallback);
+  const name = typeof feature?.name === "string" && feature.name.trim() ? feature.name.trim() : undefined;
+  return { name, top: list(feature?.name_content, PROBE_TOP), bottom: list(feature?.state_content, PROBE_BOTTOM) };
+}
+
 /** Whether a grill feature is Sous Chef probes (the probes' tiles). */
 export const isProbeTiles = (feature: Config): boolean => feature?.type === `custom:${FEATURES.probeTiles}`;
 
@@ -80,13 +91,15 @@ export function grillConfig(config: Config, open = true): Config {
  * probe's color, with the food, its doneness and status as the state, and the probe
  * features below, two to a row.
  */
-export function probeConfig(probe: Probe, name: string, features: Config[] = defaultProbeFeatures()): Config {
+export function probeConfig(probe: Probe, name: string, features: Config[] = defaultProbeFeatures(), lines = probeLinesOf()): Config {
   return {
     type: "tile",
     entity: probe.entities.food_type ?? probe.entities.active,
-    name,
+    name: lines.name ?? name,
     color: tileColorOf(probe),
-    state_content: ["state", "doneness", "status"],
+    state_content: lines.bottom,
+    // The top line, which the card draws in place of the name (see tile.ts)
+    sc_primary: lines.top,
     features,
     features_position: "bottom",
     // A tap on the icon lists the foods (the card's own list over it, see tile.ts); elsewhere, nothing

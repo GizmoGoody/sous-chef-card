@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { featureForm } from "../../src/features/form";
-import { checkConfig, grillConfig, minimal, probeConfig, probeFeaturesOf, probeTilesOf, stubConfig, tileConfig } from "../../src/card/options";
+import { checkConfig, grillConfig, minimal, probeConfig, probeFeaturesOf, probeLinesOf, probeTilesOf, stubConfig, tileConfig } from "../../src/card/options";
 import type { HomeAssistant } from "../../src/ha";
 import {
   aheadText, allProbes, ambients, axisRange, channelReadings, durationText, grillBadge, grillLine, internalSensor, probeDevices, probeLine, probeOf,
@@ -246,6 +246,13 @@ describe("Sous Chef probes", () => {
     expect(probeFeaturesOf(probeTilesOf(config))).toEqual([{ type: "custom:sous-chef-cook" }]);
     expect(probeFeaturesOf({ type: "custom:sous-chef-probe-tiles" })).toHaveLength(4);
     expect(probeTilesOf({ ...config, features: [] })).toBeUndefined();
+  });
+  it("gives each probe's tile its lines and name, or the defaults", () => {
+    expect(probeLinesOf()).toEqual({ name: undefined, top: ["name"], bottom: ["state", "doneness", "status"] });
+    const lines = probeLinesOf({ type: "custom:sous-chef-probe-tiles", name: " Brisket ", name_content: ["name", "state"], state_content: "status" });
+    expect(lines).toEqual({ name: "Brisket", top: ["name", "state"], bottom: ["status"] });
+    const tile = probeConfig(probeOf(kit(), "red")!, "Red", undefined, lines);
+    expect([tile.name, tile.sc_primary, tile.state_content]).toEqual(["Brisket", ["name", "state"], ["status"]]);
   });
   it("is on a new card", () => expect(stubConfig(kit()).features.map((f: { type: string }) => f.type)).toContain("custom:sous-chef-probe-tiles"));
 });

@@ -156,6 +156,8 @@ type Card = HTMLElement & { setConfig(config: Config): void; hass?: HomeAssistan
 // What the card reads of the history graph's chart (Apache ECharts, inside Home Assistant's ha-chart-base)
 type Chart = {
   getDom(): HTMLElement;
+  getWidth(): number;
+  resize(): void;
   getModel(): { getComponent(type: string, index: number): any };
 };
 
@@ -164,14 +166,14 @@ const HOURS = 1;
 const HISTORY_HEIGHT = 240;
 const HISTORY_PER_PROBE = 24;
 const HISTORY_MAX = 360;
-// The share of the width the history takes while the projections are shown; the projections take the rest, from the plot's edge
-const PAST = 0.68;
 // Room kept right of the projections (px)
 const AHEAD_END = 18;
 // The legend's More chip moved over, for the projections key on its left (px)
 const KEY_ROOM = 44;
-// Home Assistant's legend: room before More for the projections key
-const LEGEND_SHEET = `.chart-legend li.legend-more { margin-left: ${KEY_ROOM}px; }`;
+// Home Assistant's legend: room before More for the projections key. And while the time ahead is shown, the chart
+// narrowed to the history's share (--sc-plot-width), the legend still across the whole graph, so it stays centered
+const LEGEND_SHEET = `.chart-legend li.legend-more { margin-left: ${KEY_ROOM}px; }
+  .chart-container { width: var(--sc-plot-width, 100%) !important; }`;
 let legendSheet: CSSStyleSheet | undefined;
 
 /** A projection: from now and a reading, to a time ahead (0 to 1 of the time shown) and a reading. */
@@ -241,7 +243,6 @@ export class SousChefHistory extends SousChefFeature {
     :host([sc-console]) .box { box-shadow: inset 0 3px 6px rgba(0,0,0,.6); }
     /* Home Assistant's history graph card sizes its chart from its own height: it needs a box of a set height to fill */
     .graph { flex: 1 1 auto; min-width: 0; height: 100%; }
-    .projected .graph { flex: 0 0 ${PAST * 100}%; }
     .graph > * { display: block; height: 100%; }
     /* The time ahead: from the plot's right edge (placed when the chart is read), with room at the end */
     .ahead { position: absolute; top: 0; bottom: 0; right: ${AHEAD_END}px; display: none; }
@@ -262,6 +263,8 @@ export class SousChefHistory extends SousChefFeature {
   private _resize = new ResizeObserver(() => this._drawAhead());
   private _ahead: Projection[] = [];
   private _scale?: { top: number; bottom: number; min: number; max: number; left: number; keyX?: number; keyY?: number };
+  // The chart's width (px) while the time ahead is shown: the history and the time ahead on one time scale
+  private _plotWidth?: number;
   private _warned = false;
   private _paletteKey?: string;
 
@@ -310,10 +313,11 @@ export class SousChefHistory extends SousChefFeature {
     return steps[Math.min(Math.max(this._step, 0), steps.length - 1)];
   }
 
-  // Each tap goes to the next span: until every food is done, then halves, then 15, 10 and 5 minutes, then the targets again
+  // Each tap goes to the next span: until every food is done, then halves, then 15, 10 and 5 minutes, then off
   private _toggle(): void {
     const steps = horizons(this._untilDone());
-    this._step = this._step < 0 ? 0 : (this._step + 1) % steps.length;
+    this._step = this._step + 1 >= steps.length ? -1 : this._step + 1;
+    if (this._step < 0) this._plotWidth = undefined;
     try {
       window.localStorage.setItem(this._storageKey, `step:${this._step}`);
     } catch {
@@ -444,7 +448,7 @@ export class SousChefHistory extends SousChefFeature {
     const lines = allProbes(this._hass!).filter((p) => isActive(this._hass!, p)).length;
     const height = `${Math.min(HISTORY_MAX, HISTORY_HEIGHT + Math.max(0, lines - 1) * HISTORY_PER_PROBE)}px`;
     return html`<div class="box ${this._projected ? "projected" : ""}" style=${styleMap({ ...palette, "--sc-history-height": height })}>
-      <div class="graph">${this._graph ?? nothing}</div>
+      <div class="graph" style=${styleMap({ "--sc-plot-width": this._projected && this._plotWidth ? `${this._plotWidth}px` : undefined })}>${this._graph ?? nothing}</div>
       <div class="ahead ${s ? "placed" : ""}" aria-hidden="true" style=${styleMap({ left: s ? `${s.left}px` : undefined })}>
         <svg>
           ${s ? svg`<line x1="0" x2="0" y1=${s.top} y2=${s.bottom} stroke="currentColor" stroke-opacity=".45" stroke-dasharray="2 3"></line>` : nothing}
@@ -454,7 +458,7 @@ export class SousChefHistory extends SousChefFeature {
         ${s ? html`<span class="label" style=${styleMap({ top: `${s.bottom + 6}px` })}>${aheadText(span)}</span>` : nothing}
       </div>
       ${projections ? html`<button type="button" class="key project ${s?.keyX !== undefined ? "placed" : ""}" aria-pressed=${this._projected ? "true" : "false"}
-        title=${this._projected ? `Projected: ${aheadText(span)}. Tap for a shorter time` : "Projected temperatures"} aria-label="Projected temperatures"
+        title=${this._projected ? `Projected: ${aheadText(span)}. Tap for a shorter time, or off after 5 minutes` : "Projected temperatures"} aria-label="Projected temperatures"
         style=${styleMap({ "--c": cssColor(GRILL_COLOR), left: s?.keyX !== undefined ? `${s.keyX}px` : undefined, top: s?.keyY !== undefined ? `${s.keyY}px` : undefined })}
         @click=${this._toggle}>
         <ha-icon icon="mdi:chart-timeline-variant"></ha-icon>
@@ -476,7 +480,7 @@ export class SousChefHistory extends SousChefFeature {
    */
   private _foldLegend(base: HTMLElement): void {
     const root = base.shadowRoot;
-    if (root && this.option<boolean>("projections") !== false) adopt(root, (legendSheet ??= sheetOf(LEGEND_SHEET)));
+    if (root) adopt(root, (legendSheet ??= sheetOf(LEGEND_SHEET)));
     const fitter = (base as unknown as { _legendFit?: { fit?: number; scFolded?: boolean } })._legendFit;
     if (!fitter || fitter.scFolded) return;
     Object.defineProperty(fitter, "fit", { get: () => 0, set: () => undefined, configurable: true });
@@ -507,6 +511,26 @@ export class SousChefHistory extends SousChefFeature {
       const box = this.renderRoot.querySelector(".box")!.getBoundingClientRect();
       const dom = chart.getDom().getBoundingClientRect();
       const more = base!.shadowRoot?.querySelector(".chart-legend li.legend-more:not(.overflow)")?.getBoundingClientRect();
+      // The time ahead on the history's scale: the plot narrowed so that, from its edge to the end, the span ahead takes
+      // as many pixels a minute as the history does
+      const hours = Number(this._config?.hours_to_show) > 0 ? Number(this._config!.hours_to_show) : HOURS;
+      const offset = dom.left - box.left;
+      const plot = this._projected ? Math.max(80, (box.width - AHEAD_END - offset - rect.x) / (1 + this._horizon() / (hours * 60))) : undefined;
+      const width = plot === undefined ? undefined : Math.round(rect.x + plot + (dom.width - rect.x - rect.width));
+      if (width !== this._plotWidth) {
+        this._plotWidth = width;
+        this.requestUpdate();
+        requestAnimationFrame(() => {
+          chart.resize();
+          requestAnimationFrame(() => this._drawAhead());
+        });
+        return;
+      }
+      if (Math.abs(chart.getWidth() - dom.width) > 1) {
+        chart.resize();
+        requestAnimationFrame(() => this._drawAhead());
+        return;
+      }
       const scale = {
         top: dom.top - box.top + rect.y, bottom: dom.top - box.top + rect.y + rect.height, min: extent[0], max: extent[1],
         left: dom.left - box.left + rect.x + rect.width,
@@ -556,7 +580,7 @@ export class SousChefProgressBars extends SousChefFeature {
     .fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 4px; background: var(--c); transition: width 600ms ease-in-out; }
     .fill.stalled { background: repeating-linear-gradient(135deg, rgba(255,255,255,.4) 0 4px, transparent 4px 8px), var(--c); }
     .goal { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: rgba(0,0,0,.6); }
-    .reading { flex: none; min-width: 60px; font-size: var(--text, 12px); font-weight: 500; line-height: 1; text-align: center; white-space: nowrap; }
+    .reading { flex: none; width: var(--reading, 62px); font-size: var(--text, 12px); font-weight: 500; line-height: 1; text-align: left; white-space: nowrap; overflow: hidden; }
     :host([sc-console]) .bar { box-shadow: inset 0 1px 2px rgba(0,0,0,.45); }
     @media (prefers-reduced-motion: reduce) { .fill { transition: none; } }
   `];
@@ -577,7 +601,7 @@ export class SousChefProgressBars extends SousChefFeature {
     const side = choice === false || choice === "off" ? "off" : choice === "right" ? "right" : "left";
     const readings = side !== "off";
     const n = on.length;
-    return html`<div class="bars" style=${styleMap({ "--rows": String(n), "--bar": n > 2 ? "4px" : "6px", "--text": n > 3 ? "10px" : n > 2 ? "11px" : "12px" })}>
+    return html`<div class="bars" style=${styleMap({ "--rows": String(n), "--bar": n > 2 ? "4px" : "6px", "--text": n > 3 ? "10px" : n > 2 ? "11px" : "12px", "--reading": n > 3 ? "52px" : n > 2 ? "56px" : "62px" })}>
       ${on.map((p) => {
         const bar = cookBar(hass, p);
         const title = `${names.get(p.device)}: ${bar.label || "no reading"}`;

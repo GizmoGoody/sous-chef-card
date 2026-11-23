@@ -88,6 +88,8 @@ export class SousChefField extends LitElement {
   // Whether a press and slide changes it (with a list, only at Custom)
   slide = true;
   private _open = false;
+  // When a slide last ended: the tap that ends it does not open the list
+  private _slidAt = 0;
   private _pending?: number;
   private _shown = "";
 
@@ -98,7 +100,10 @@ export class SousChefField extends LitElement {
 
   constructor() {
     super();
-    scrub(this, () => ({ change: (steps) => this._slide(steps), done: () => this._release() }));
+    scrub(this, () => ({ change: (steps) => this._slide(steps), done: () => {
+      this._slidAt = Date.now();
+      this._release();
+    } }));
   }
 
   // Drawn in the feature's own shadow root, in the feature's styles
@@ -133,7 +138,7 @@ export class SousChefField extends LitElement {
     return html`${this.icon ? html`<ha-icon .icon=${this.icon}></ha-icon>` : nothing}<input type="text" inputmode="decimal"
       enterkeyhint="done" placeholder=${this.placeholder} aria-label=${this.name} ?disabled=${!this._usable}
       ?readonly=${!!this.menu && !this._open} @blur=${this._blur}
-      @keydown=${this._key} @input=${this._typing} @change=${this._typed} @click=${(ev: Event) => ev.stopPropagation()}><span class="unit">°</span>${this._list()}`;
+      @keydown=${this._key} @input=${this._typing} @change=${this._typed} @click=${this._tap}><span class="unit">°</span>${this._list()}`;
   }
 
   /** The list over the field; at Custom nothing is shown chosen, so choosing Custom again still opens the keyboard. */
@@ -141,12 +146,26 @@ export class SousChefField extends LitElement {
     const m = this.menu;
     if (!m) return nothing;
     const atCustom = m.selected === m.custom;
-    return html`<select aria-label=${this.name} ?disabled=${!this._usable} .value=${atCustom ? "" : m.selected}
+    // While it slides (at Custom), the list lets the press through to the field, and a tap opens it
+    return html`<select class=${this.slide ? "passive" : ""} aria-label=${this.name} ?disabled=${!this._usable} .value=${atCustom ? "" : m.selected}
       @click=${(ev: Event) => ev.stopPropagation()} @change=${this._chosen}>
       ${atCustom ? html`<option value="" hidden></option>` : nothing}
       ${m.options.map((o) => html`<option value=${o.value} ?selected=${!atCustom && o.value === m.selected}>${o.label}</option>`)}
     </select>`;
   }
+
+  private _tap = (ev: Event) => {
+    ev.stopPropagation();
+    if (!this.menu || !this.slide || this._open || Date.now() - this._slidAt < 500) return;
+    const select = this.querySelector<HTMLSelectElement & { showPicker?: () => void }>("select");
+    if (!select) return;
+    try {
+      select.showPicker!();
+    } catch {
+      // Browsers without showPicker open a list when it is focused in a tap
+      select.focus();
+    }
+  };
 
   private _chosen = (ev: Event) => {
     const m = this.menu!, select = ev.target as HTMLSelectElement, value = select.value;

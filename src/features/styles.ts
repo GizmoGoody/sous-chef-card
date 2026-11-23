@@ -90,6 +90,9 @@ export const featureStyles = [rowStyles, css`
   /* A key or field that opens a list: the browser's own list, over the whole of it */
   .key select, .field select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font: inherit; }
   .key select:disabled, .field select:disabled { cursor: default; }
+  /* A field that slides: its list opened by a tap on the field, so a press and slide reaches the field */
+  .field select.passive { pointer-events: none; }
+  .field.drag.menu input { cursor: pointer; touch-action: none; }
   span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   @media (prefers-reduced-motion: reduce) { .key, .key::before { transition: none; } }
 `, consoleStyles];

@@ -62,8 +62,13 @@ export class SousChefTile extends LitElement {
   private _innerKey?: string;
   private _sourceState?: HassEntity;
   private _outerHass?: HomeAssistant;
+  // A probe's top line: state content, drawn by Home Assistant's own state display in place of the name
+  private _primary?: string[];
 
-  setConfig(config: Config): void {
+  setConfig(input: Config): void {
+    // A probe's top line is the card's own (sc_primary), not the tile card's
+    const { sc_primary: primary, ...config } = input;
+    this._primary = Array.isArray(primary) ? primary : undefined;
     this._config = config;
     if (this._tile) this._tile.setConfig(config);
     else if (customElements.get("hui-tile-card")) this._createTile(config);
@@ -220,6 +225,35 @@ export class SousChefTile extends LitElement {
     </select>`;
   }
 
+  /**
+   * A probe's top line: Home Assistant's state display in the name's place
+   * (its primary slot, so it keeps the name's look), showing what is chosen
+   * for it, with the name (as chosen, or the probe's) for "name".
+   */
+  private _placePrimary(): void {
+    const tile = this._tile, info = tile?.shadowRoot?.querySelector("ha-tile-info");
+    if (!tile || !info) return;
+    let span = info.querySelector<HTMLElement>(":scope > span.sc-primary");
+    if (!this._primary || !this._innerState) {
+      span?.remove();
+      tile.removeAttribute("sc-primary");
+      return;
+    }
+    if (!span) {
+      span = document.createElement("span");
+      span.slot = "primary";
+      span.className = "primary sc-primary";
+      span.append(document.createElement("state-display"));
+      info.append(span);
+    }
+    const display = span.firstElementChild as HTMLElement & { stateObj?: HassEntity; content?: string[]; name?: string; hass?: HomeAssistant };
+    display.hass = this._hass;
+    display.stateObj = this._innerState;
+    display.content = this._primary;
+    display.name = typeof this._config?.name === "string" ? this._config.name : undefined;
+    tile.setAttribute("sc-primary", "");
+  }
+
   /** The food type's list exactly over the probe's icon. */
   private _placeFood(icon?: Element | null): void {
     const menu = this.renderRoot.querySelector<HTMLElement>("select.food");
@@ -264,7 +298,10 @@ export class SousChefTile extends LitElement {
     if (this.kind === "probe") this._placeFeatures();
     else this._fullWidth();
     this._placeBadge(icon);
-    if (this.kind === "probe") this._placeFood(icon);
+    if (this.kind === "probe") {
+      this._placeFood(icon);
+      this._placePrimary();
+    }
   }
 
   /** The features style on this card's features: Console makes their keys press in. */

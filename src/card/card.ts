@@ -11,7 +11,7 @@ import { EDITOR_TYPE, TILE_TYPE } from "../const";
 import type { Config, HomeAssistant } from "../ha";
 import { finishOf } from "../grill/finishes";
 import { allProbes, isActive, probeNames, type Probe } from "../sous-chef";
-import { checkConfig, grillConfig, optionOf, probeConfig, probeFeaturesOf, probeTilesOf, stubConfig } from "./options";
+import { checkConfig, grillConfig, optionOf, probeConfig, probeFeaturesOf, probeLinesOf, probeTilesOf, stubConfig } from "./options";
 import { cardStyles } from "./styles";
 import type { SousChefTile } from "./tile";
 
@@ -99,7 +99,8 @@ export class SousChefCard extends LitElement {
     const tiles = probeTilesOf(config);
     const features = probeFeaturesOf(tiles);
     const on: Probe[] = tiles ? probes.filter((p) => isActive(hass, p)) : [];
-    const key = JSON.stringify(features);
+    const lines = probeLinesOf(tiles);
+    const key = JSON.stringify([features, lines]);
     const shown = on.map((p) => `${p.device}|${names.get(p.device)}|${p.colors.join(",")}|${p.entities.food_type}|${key}`);
     for (const p of on) {
       let tile = this._probes.get(p.device);
@@ -110,7 +111,7 @@ export class SousChefCard extends LitElement {
         tile.preview = this._preview;
         this._probes.set(p.device, tile);
       }
-      if (fresh || shown.join() !== this._shown.join()) tile.setConfig(probeConfig(p, names.get(p.device)!, features));
+      if (fresh || shown.join() !== this._shown.join()) tile.setConfig(probeConfig(p, names.get(p.device)!, features, lines));
       tile.hass = hass;
     }
     for (const device of [...this._probes.keys()]) if (!on.some((p) => p.device === device)) this._probes.delete(device);

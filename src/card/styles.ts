@@ -63,7 +63,8 @@ export const tileStyles = css`
 export const TILE_SHEET = `
   ha-tile-container { --ha-ripple-hover-opacity: 0; }
   :host([sc-icon-color]) ha-tile-icon { --tile-icon-color: var(--sc-icon-color) !important; }
-  :host([sc-brand]) ha-tile-icon { --tile-icon-border-radius: 0; width: auto; max-width: 126px; }`;
+  :host([sc-brand]) ha-tile-icon { --tile-icon-border-radius: 0; width: auto; max-width: 126px; }
+  :host([sc-primary]) #name { display: none; }`;
 
 /** A brand's mark in place of the icon: as wide as the mark, not a circle. */
 export const ICON_SHEET = `

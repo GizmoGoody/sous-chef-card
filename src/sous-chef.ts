@@ -391,7 +391,7 @@ export function cookBar(hass: HomeAssistant, probe: Probe): CookBar {
 /**
  * How far the projections go, in minutes, tap by tap: until every probe
  * reaches its target, then half that and half again while longer than 15
- * minutes, then 15, 10 and 5, then back to the targets.
+ * minutes, then 15, 10 and 5 (and after them, off).
  */
 export function horizons(untilDone: number): number[] {
   const all = Math.max(5, Math.ceil(untilDone));
