@@ -73,18 +73,21 @@ export class SousChefCardEditor extends LitElement {
     this.requestUpdate();
   }
 
-  /** The tile editor's hass, with the grill's cook as an attribute, so State content offers it. */
+  /**
+   * The tile editor gets Home Assistant's own hass, as in the Prusa Connect
+   * card: a new copy on every state change would draw its fields again
+   * while they are edited (the name lost its changes). The states context,
+   * which its State content picker reads, carries the grill's cook.
+   */
   private _setTileEditorHass(): void {
     const hass = this._hass, entity = this._config?.entity;
-    if (!hass || !this._tileEditor) return;
-    let shown = hass;
+    if (!hass) return;
     const stateObj = entity ? hass.states[entity] : undefined;
-    if (stateObj) {
-      const cook = grillLine(hass, ambientOf(hass, entity), allProbes(hass));
-      shown = { ...hass, states: statesWith(hass.states, entity, { ...stateObj, attributes: { ...stateObj.attributes, cook } }) };
-    }
-    this._statesProvider.states = shown.states;
-    this._tileEditor.hass = shown;
+    this._statesProvider.states = stateObj
+      ? statesWith(hass.states, entity, { ...stateObj, attributes: { ...stateObj.attributes, cook: grillLine(hass, ambientOf(hass, entity), allProbes(hass)) } })
+      : hass.states;
+    if (!this._tileEditor) return;
+    this._tileEditor.hass = hass;
     this._tileEditor.scEntities = ambients(hass).map((a) => a.sensor);
   }
 
@@ -101,6 +104,9 @@ export class SousChefCardEditor extends LitElement {
         delete next.show_entity_picture;
         this._config = next;
         this._fire();
+        this.requestUpdate();
+        // The tile editor shows a change once it is handed back (as a dashboard's editor does), as in the Prusa Connect card
+        editor.setConfig(tileConfig(next));
       });
       editor.scEntityHelper = "The grill: a Sous Chef ambient sensor.";
       if (this._lovelace) editor.lovelace = this._lovelace;
