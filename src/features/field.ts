@@ -49,7 +49,7 @@ function scrub(el: HTMLElement, handlers: () => { change: (steps: number) => voi
     if (sliding) handlers().done();
   };
   el.addEventListener("pointerdown", (ev) => {
-    if (el.classList.contains("disabled") || ev.button !== 0) return;
+    if (el.classList.contains("disabled") || !el.classList.contains("drag") || ev.button !== 0) return;
     start = at = { x: ev.clientX, y: ev.clientY };
   });
   el.addEventListener("pointermove", (ev) => {
@@ -83,12 +83,17 @@ export class SousChefField extends LitElement {
   empty?: number;
   // An alarm past its limit: the field turns red
   alarm = false;
+  // A list over the field (the doneness): a tap opens it; choosing Custom opens the keyboard
+  menu?: FieldMenu;
+  // Whether a press and slide changes it (with a list, only at Custom)
+  slide = true;
+  private _open = false;
   private _pending?: number;
   private _shown = "";
 
   static override properties = {
     entity: { attribute: false }, hass: { attribute: false }, icon: { attribute: false }, placeholder: { attribute: false },
-    name: { attribute: false }, empty: { attribute: false }, alarm: { attribute: false },
+    name: { attribute: false }, empty: { attribute: false }, alarm: { attribute: false }, menu: { attribute: false }, slide: { attribute: false },
   };
 
   constructor() {
@@ -127,17 +132,56 @@ export class SousChefField extends LitElement {
     if (!this.hass || !this.entity) return nothing;
     return html`${this.icon ? html`<ha-icon .icon=${this.icon}></ha-icon>` : nothing}<input type="text" inputmode="decimal"
       enterkeyhint="done" placeholder=${this.placeholder} aria-label=${this.name} ?disabled=${!this._usable}
-      @keydown=${this._key} @input=${this._typing} @change=${this._typed} @click=${(ev: Event) => ev.stopPropagation()}><span class="unit">°</span>`;
+      ?readonly=${!!this.menu && !this._open} @blur=${this._blur}
+      @keydown=${this._key} @input=${this._typing} @change=${this._typed} @click=${(ev: Event) => ev.stopPropagation()}><span class="unit">°</span>${this._list()}`;
   }
+
+  /** The list over the field; at Custom nothing is shown chosen, so choosing Custom again still opens the keyboard. */
+  private _list(): TemplateResult | typeof nothing {
+    const m = this.menu;
+    if (!m) return nothing;
+    const atCustom = m.selected === m.custom;
+    return html`<select aria-label=${this.name} ?disabled=${!this._usable} .value=${atCustom ? "" : m.selected}
+      @click=${(ev: Event) => ev.stopPropagation()} @change=${this._chosen}>
+      ${atCustom ? html`<option value="" hidden></option>` : nothing}
+      ${m.options.map((o) => html`<option value=${o.value} ?selected=${!atCustom && o.value === m.selected}>${o.label}</option>`)}
+    </select>`;
+  }
+
+  private _chosen = (ev: Event) => {
+    const m = this.menu!, select = ev.target as HTMLSelectElement, value = select.value;
+    if (value !== m.custom) {
+      m.choose(value);
+      return;
+    }
+    if (m.selected !== m.custom) m.choose(m.custom);
+    // Custom: the keyboard, at once, for the new temperature
+    const input = this._input!;
+    this._open = true;
+    input.readOnly = false;
+    input.focus();
+    input.select();
+    select.value = "";
+  };
+
+  private _blur = () => {
+    if (!this.menu || !this._open) return;
+    this._open = false;
+    this.requestUpdate();
+  };
 
   protected override updated(): void {
     if (!this.hass) return;
     this._shown = this._format(this._value());
-    this.classList.add("field", "drag");
+    this.classList.add("field");
+    this.classList.toggle("drag", this.slide);
+    this.classList.toggle("menu", !!this.menu);
     this.classList.toggle("disabled", !this._usable);
     this.classList.toggle("alarm", this.alarm);
     this.dataset.min = String(ITEM_MIN.field);
-    const name = `${this.name}. Tap to type, or press and slide`;
+    const name = this.menu
+      ? `${this.name}. Tap to choose${this.slide ? ", or press and slide" : ""}`
+      : `${this.name}. Tap to type, or press and slide`;
     if (this.title !== name) this.title = name;
     // The number shown, unless it is being typed in
     const input = this._input;
@@ -213,10 +257,18 @@ export class SousChefField extends LitElement {
 
 export const FIELD_TAG = "sous-chef-field";
 
+/** A list over a field: its options, the one chosen, the one that types a number in, and how one is chosen. */
+export interface FieldMenu {
+  options: { value: string; label: string }[];
+  selected: string;
+  custom: string;
+  choose: (value: string) => void;
+}
+
 /** A field for a number entity, or nothing without one. */
 export function numberField(hass: HomeAssistant, entityId: string | undefined,
-  o: { icon?: string; placeholder: string; title: string; empty?: number; alarm?: boolean }): TemplateResult | typeof nothing {
+  o: { icon?: string; placeholder: string; title: string; empty?: number; alarm?: boolean; menu?: FieldMenu; slide?: boolean }): TemplateResult | typeof nothing {
   if (!entityId || !hass.states[entityId]) return nothing;
   return html`<sous-chef-field .hass=${hass} .entity=${entityId} .icon=${o.icon} .placeholder=${o.placeholder} .name=${o.title}
-    .empty=${o.empty} .alarm=${!!o.alarm}></sous-chef-field>`;
+    .empty=${o.empty} .alarm=${!!o.alarm} .menu=${o.menu} .slide=${o.slide ?? true}></sous-chef-field>`;
 }

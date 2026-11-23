@@ -387,3 +387,22 @@ export function cookBar(hass: HomeAssistant, probe: Probe): CookBar {
     label: !reading ? "" : target !== undefined ? `${whole(internal!)} → ${whole(target)} ${unit}` : `${whole(internal!)} ${unit}`,
   };
 }
+
+/**
+ * How far the projections go, in minutes, tap by tap: until every probe
+ * reaches its target, then half that and half again while longer than 15
+ * minutes, then 15, 10 and 5, then back to the targets.
+ */
+export function horizons(untilDone: number): number[] {
+  const all = Math.max(5, Math.ceil(untilDone));
+  const out = [all];
+  for (let h = all / 2; h > 15; h /= 2) out.push(Math.round(h));
+  for (const m of [15, 10, 5]) if (m < out[out.length - 1]) out.push(m);
+  return out;
+}
+
+/** A time ahead in words: +2 h 30 min, +1 h, +15 min. */
+export function aheadText(minutes: number): string {
+  const h = Math.floor(minutes / 60), m = Math.round(minutes % 60);
+  return h ? `+${h} h${m ? ` ${m} min` : ""}` : `+${m} min`;
+}

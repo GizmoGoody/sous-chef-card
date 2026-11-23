@@ -5,9 +5,9 @@
 import { css, html, nothing, svg, type TemplateResult } from "lit";
 import { styleMap } from "lit/directives/style-map.js";
 import { FEATURES, GRILL_COLOR } from "../const";
-import { cssColor, darkMode, dim, entityName, findDeep, moreInfo, numberOf, toHex, type Config, type HomeAssistant } from "../ha";
+import { adopt, cssColor, darkMode, dim, entityName, findDeep, moreInfo, numberOf, sheetOf, toHex, type Config, type HomeAssistant } from "../ha";
 import {
-  allProbes, axisRange, colorOf, cookBar, iconColorOf, doneAtOf, internalSensor, internalValue, isActive, probeNames, rateIcon, rateText, statusOf, trendOf,
+  aheadText, allProbes, axisRange, colorOf, cookBar, horizons, iconColorOf, doneAtOf, internalSensor, internalValue, isActive, probeNames, rateIcon, rateText, statusOf, trendOf,
   valueOf, whole, type Probe,
 } from "../sous-chef";
 import { readout, SousChefFeature } from "./base";
@@ -164,10 +164,17 @@ const HOURS = 1;
 const HISTORY_HEIGHT = 240;
 const HISTORY_PER_PROBE = 24;
 const HISTORY_MAX = 360;
-// The share of the width the projections take, right of the history
-const AHEAD = 0.3;
+// The share of the width the history takes while the projections are shown; the projections take the rest, from the plot's edge
+const PAST = 0.68;
+// Room kept right of the projections (px)
+const AHEAD_END = 18;
+// The legend's More chip moved over, for the projections key on its left (px)
+const KEY_ROOM = 44;
+// Home Assistant's legend: room before More for the projections key
+const LEGEND_SHEET = `.chart-legend li.legend-more { margin-left: ${KEY_ROOM}px; }`;
+let legendSheet: CSSStyleSheet | undefined;
 
-/** A projection: from now and a reading, to a time ahead (0 to 1 of the hour ahead) and a reading. */
+/** A projection: from now and a reading, to a time ahead (0 to 1 of the time shown) and a reading. */
 interface Projection {
   color: string;
   from: number;
@@ -234,23 +241,27 @@ export class SousChefHistory extends SousChefFeature {
     :host([sc-console]) .box { box-shadow: inset 0 3px 6px rgba(0,0,0,.6); }
     /* Home Assistant's history graph card sizes its chart from its own height: it needs a box of a set height to fill */
     .graph { flex: 1 1 auto; min-width: 0; height: 100%; }
+    .projected .graph { flex: 0 0 ${PAST * 100}%; }
     .graph > * { display: block; height: 100%; }
-    .ahead { position: relative; flex: 0 0 ${AHEAD * 100}%; height: 100%; display: none; }
-    .projected .ahead { display: block; }
+    /* The time ahead: from the plot's right edge (placed when the chart is read), with room at the end */
+    .ahead { position: absolute; top: 0; bottom: 0; right: ${AHEAD_END}px; display: none; }
+    .projected .ahead.placed { display: block; }
     .ahead svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-    .ahead .label { position: absolute; right: 4px; font-size: 11px; color: var(--secondary-text-color); }
-    .project { position: absolute; top: 6px; right: 8px; width: 28px; height: 28px; flex: none; min-width: 28px; padding: 0; z-index: 1;
-      border-radius: 14px; }
+    .ahead .label { position: absolute; right: 0; font-size: 11px; color: var(--secondary-text-color); white-space: nowrap; }
+    /* The projections key, left of the legend's More (placed when the chart is read) */
+    .project { position: absolute; display: none; width: 32px; height: 32px; flex: none; min-width: 32px; padding: 0; z-index: 1; border-radius: 16px; }
+    .project.placed { display: flex; }
     .project ha-icon { --mdc-icon-size: 18px; }
   `];
 
   private _graph?: Card;
   private _loading = false;
   private _shown?: string;
-  private _projected = false;
+  // The step of the projections (see horizons), or -1 while they are not shown
+  private _step = -1;
   private _resize = new ResizeObserver(() => this._drawAhead());
   private _ahead: Projection[] = [];
-  private _scale?: { top: number; bottom: number; min: number; max: number };
+  private _scale?: { top: number; bottom: number; min: number; max: number; left: number; keyX?: number; keyY?: number };
   private _warned = false;
   private _paletteKey?: string;
 
@@ -267,7 +278,9 @@ export class SousChefHistory extends SousChefFeature {
   override connectedCallback(): void {
     super.connectedCallback();
     try {
-      this._projected = window.localStorage.getItem(this._storageKey) === "1";
+      const stored = window.localStorage.getItem(this._storageKey);
+      this._step = stored === null ? -1 : stored === "1" ? 0 : Number(stored.replace("step:", "")) || 0;
+      if (stored === "0") this._step = -1;
     } catch {
       // Storage can be unavailable (private windows)
     }
@@ -279,10 +292,30 @@ export class SousChefHistory extends SousChefFeature {
     this._resize.disconnect();
   }
 
+  private get _projected(): boolean {
+    return this._step >= 0;
+  }
+
+  /** Minutes until every probe that is on reaches its target (by its Done at time); an hour without one. */
+  private _untilDone(): number {
+    const hass = this._hass!, now = Date.now();
+    const times = allProbes(hass).filter((p) => isActive(hass, p) && statusOf(hass, p) !== "done")
+      .map((p) => doneAtOf(hass, p)?.getTime()).filter((t): t is number => !!t && t > now).map((t) => (t - now) / 60000);
+    return times.length ? Math.max(...times) : 60;
+  }
+
+  /** The minutes the projections show now. */
+  private _horizon(): number {
+    const steps = horizons(this._untilDone());
+    return steps[Math.min(Math.max(this._step, 0), steps.length - 1)];
+  }
+
+  // Each tap goes to the next span: until every food is done, then halves, then 15, 10 and 5 minutes, then the targets again
   private _toggle(): void {
-    this._projected = !this._projected;
+    const steps = horizons(this._untilDone());
+    this._step = this._step < 0 ? 0 : (this._step + 1) % steps.length;
     try {
-      window.localStorage.setItem(this._storageKey, this._projected ? "1" : "0");
+      window.localStorage.setItem(this._storageKey, `step:${this._step}`);
     } catch {
       // The choice still holds while the page is open
     }
@@ -323,8 +356,8 @@ export class SousChefHistory extends SousChefFeature {
     return config;
   }
 
-  /** The projections: the grill level, each probe toward its target at its Done at time (or at its rate). */
-  private _projections(): Projection[] {
+  /** The projections over the time shown: the grill level, each probe toward its target at its Done at time (or at its rate). */
+  private _projections(span: number): Projection[] {
     const hass = this._hass!, ambient = this.ambient!;
     const out: Projection[] = [];
     const grill = valueOf(hass, ambient.sensor);
@@ -339,10 +372,10 @@ export class SousChefHistory extends SousChefFeature {
       const rate = valueOf(hass, p.entities.rate);
       if (target !== undefined && doneAt && doneAt.getTime() > now) {
         const minutes = (doneAt.getTime() - now) / 60000;
-        const reach = Math.min(1, 60 / minutes);
-        out.push({ color: hex(colorOf(p)), from: internal, to: internal + (target - internal) * reach, at: Math.min(1, minutes / 60) });
+        const reach = Math.min(1, span / minutes);
+        out.push({ color: hex(colorOf(p)), from: internal, to: internal + (target - internal) * reach, at: Math.min(1, minutes / span) });
       } else if (rate !== undefined) {
-        const to = target !== undefined && rate > 0 ? Math.min(target, internal + rate * 60) : internal + rate * 60;
+        const to = target !== undefined && rate > 0 ? Math.min(target, internal + rate * span) : internal + rate * span;
         out.push({ color: hex(colorOf(p)), from: internal, to, at: 1 });
       }
     }
@@ -379,7 +412,7 @@ export class SousChefHistory extends SousChefFeature {
     if (!config) return nothing;
     const palette = this._palette();
     const projections = this.option<boolean>("projections") !== false;
-    if (!projections) this._projected = false;
+    if (!projections) this._step = -1;
     const paletteKey = JSON.stringify(palette);
     if (paletteKey !== this._paletteKey) {
       if (this._graph) {
@@ -403,7 +436,8 @@ export class SousChefHistory extends SousChefFeature {
       }
     }
     if (this._graph) this._graph.hass = this._hass;
-    this._ahead = this._projected ? this._projections() : [];
+    const span = this._horizon();
+    this._ahead = this._projected ? this._projections(span) : [];
     const s = this._scale;
     const y = (v: number) => (s && s.max > s.min ? s.top + ((s.max - v) / (s.max - s.min)) * (s.bottom - s.top) : -100);
     // Taller as more probes are on, so the lines keep their room
@@ -411,16 +445,18 @@ export class SousChefHistory extends SousChefFeature {
     const height = `${Math.min(HISTORY_MAX, HISTORY_HEIGHT + Math.max(0, lines - 1) * HISTORY_PER_PROBE)}px`;
     return html`<div class="box ${this._projected ? "projected" : ""}" style=${styleMap({ ...palette, "--sc-history-height": height })}>
       <div class="graph">${this._graph ?? nothing}</div>
-      <div class="ahead" aria-hidden="true">
+      <div class="ahead ${s ? "placed" : ""}" aria-hidden="true" style=${styleMap({ left: s ? `${s.left}px` : undefined })}>
         <svg>
           ${s ? svg`<line x1="0" x2="0" y1=${s.top} y2=${s.bottom} stroke="currentColor" stroke-opacity=".45" stroke-dasharray="2 3"></line>` : nothing}
           ${s ? this._ahead.map((p) => svg`<line x1="0" y1=${y(p.from)} x2=${`${p.at * 100}%`} y2=${y(p.to)} stroke=${p.color}
             stroke-width="2" stroke-dasharray="5 4" stroke-linecap="round"></line>`) : nothing}
         </svg>
-        ${s ? html`<span class="label" style=${styleMap({ top: `${s.bottom + 6}px` })}>+1 h</span>` : nothing}
+        ${s ? html`<span class="label" style=${styleMap({ top: `${s.bottom + 6}px` })}>${aheadText(span)}</span>` : nothing}
       </div>
-      ${projections ? html`<button type="button" class="key project" aria-pressed=${this._projected ? "true" : "false"} title="Projected temperatures"
-        aria-label="Projected temperatures" style=${styleMap({ "--c": cssColor(GRILL_COLOR) })} @click=${this._toggle}>
+      ${projections ? html`<button type="button" class="key project ${s?.keyX !== undefined ? "placed" : ""}" aria-pressed=${this._projected ? "true" : "false"}
+        title=${this._projected ? `Projected: ${aheadText(span)}. Tap for a shorter time` : "Projected temperatures"} aria-label="Projected temperatures"
+        style=${styleMap({ "--c": cssColor(GRILL_COLOR), left: s?.keyX !== undefined ? `${s.keyX}px` : undefined, top: s?.keyY !== undefined ? `${s.keyY}px` : undefined })}
+        @click=${this._toggle}>
         <ha-icon icon="mdi:chart-timeline-variant"></ha-icon>
       </button>` : nothing}
     </div>`;
@@ -428,7 +464,24 @@ export class SousChefHistory extends SousChefFeature {
 
   protected override updated(): void {
     super.updated();
-    if (this._projected) requestAnimationFrame(() => this._drawAhead());
+    requestAnimationFrame(() => this._drawAhead());
+  }
+
+  /**
+   * Home Assistant's legend, folded with every entry under its More chip
+   * (its own list fits as many as two or three rows hold): the number it
+   * fits is held at none, so More lists them all and opens them as before.
+   * Unless Expand legend is on. If a Home Assistant update changes the
+   * legend, it is left as Home Assistant has it.
+   */
+  private _foldLegend(base: HTMLElement): void {
+    const root = base.shadowRoot;
+    if (root && this.option<boolean>("projections") !== false) adopt(root, (legendSheet ??= sheetOf(LEGEND_SHEET)));
+    const fitter = (base as unknown as { _legendFit?: { fit?: number; scFolded?: boolean } })._legendFit;
+    if (!fitter || fitter.scFolded) return;
+    Object.defineProperty(fitter, "fit", { get: () => 0, set: () => undefined, configurable: true });
+    fitter.scFolded = true;
+    (base as unknown as { requestUpdate?: () => void }).requestUpdate?.();
   }
 
   /**
@@ -438,7 +491,7 @@ export class SousChefHistory extends SousChefFeature {
    * Home Assistant update changes the chart, the projections are not drawn.
    */
   private _drawAhead(): void {
-    if (!this._projected || !this._graph) return;
+    if (!this._graph) return;
     try {
       const base = findDeep(this._graph.shadowRoot, "ha-chart-base") as (HTMLElement & { chart?: Chart }) | null;
       const chart = base?.chart;
@@ -446,14 +499,23 @@ export class SousChefHistory extends SousChefFeature {
         setTimeout(() => this._drawAhead(), 500);
         return;
       }
+      // The legend starts folded with every entry under More, which moves over for the projections key
+      this._foldLegend(base!);
       const model = chart.getModel();
       const extent: [number, number] = model.getComponent("yAxis", 0).axis.scale.getExtent();
       const rect = model.getComponent("grid", 0).coordinateSystem.getRect();
       const box = this.renderRoot.querySelector(".box")!.getBoundingClientRect();
       const dom = chart.getDom().getBoundingClientRect();
-      const scale = { top: dom.top - box.top + rect.y, bottom: dom.top - box.top + rect.y + rect.height, min: extent[0], max: extent[1] };
+      const more = base!.shadowRoot?.querySelector(".chart-legend li.legend-more:not(.overflow)")?.getBoundingClientRect();
+      const scale = {
+        top: dom.top - box.top + rect.y, bottom: dom.top - box.top + rect.y + rect.height, min: extent[0], max: extent[1],
+        left: dom.left - box.left + rect.x + rect.width,
+        keyX: more?.width ? more.left - box.left - KEY_ROOM + 6 : undefined,
+        keyY: more?.width ? more.top - box.top + (more.height - 32) / 2 : undefined,
+      };
       const old = this._scale;
-      if (!old || Object.entries(scale).some(([k, v]) => Math.abs(v - old[k as keyof typeof scale]) > 0.5)) {
+      const rounded = (o: typeof scale) => JSON.stringify(Object.values(o).map((v) => (v === undefined ? null : Math.round(v))));
+      if (!old || rounded(scale) !== rounded(old)) {
         this._scale = scale;
         this.requestUpdate();
       }
@@ -476,20 +538,25 @@ export class SousChefProgressBars extends SousChefFeature {
   static override pickerName = "Sous Chef progress";
   static override forKind = "grill" as const;
   static override options = [
-    { name: "values", label: "Values", helper: "Each probe's temperature and target before its bar", default: true, selector: { boolean: {} } },
+    {
+      name: "values", label: "Text", helper: "Each probe's temperature and target beside its bar", default: "left",
+      selector: { select: { mode: "dropdown", options: [{ value: "off", label: "Off" }, { value: "left", label: "Left" }, { value: "right", label: "Right" }] } },
+    },
   ];
 
   static override styles = [featureStyles, css`
-    /* One thin bar above another, each across the card */
-    .bars { display: grid; grid-template-columns: minmax(0, 1fr); row-gap: 6px; align-content: center; min-height: var(--feature-height, 42px); }
-    .cell { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 0; border: 0; margin: 0;
+    /* One thin bar above another, each across the card: up to four within one row's height */
+    .bars { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(var(--rows, 1), minmax(0, 1fr));
+      height: max(var(--feature-height, 42px), calc(var(--rows, 1) * 10.5px)); }
+    .cell { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 0; padding: 0; border: 0; margin: 0;
       background: none; font: inherit; color: var(--sc-text, var(--primary-text-color)); cursor: pointer; outline: none; }
-    .bar { position: relative; flex: 1; height: 6px; border-radius: 3px; overflow: hidden; }
+    .cell.right { flex-direction: row-reverse; }
+    .bar { position: relative; flex: 1; height: var(--bar, 6px); border-radius: 3px; overflow: hidden; }
     .bar::before { content: ""; position: absolute; inset: 0; background: var(--c); opacity: .22; }
     .fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 4px; background: var(--c); transition: width 600ms ease-in-out; }
     .fill.stalled { background: repeating-linear-gradient(135deg, rgba(255,255,255,.4) 0 4px, transparent 4px 8px), var(--c); }
     .goal { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: rgba(0,0,0,.6); }
-    .reading { flex: none; min-width: 72px; font-size: var(--ha-font-size-s, 12px); font-weight: 500; line-height: 16px; text-align: center; white-space: nowrap; }
+    .reading { flex: none; min-width: 60px; font-size: var(--text, 12px); font-weight: 500; line-height: 1; text-align: center; white-space: nowrap; }
     :host([sc-console]) .bar { box-shadow: inset 0 1px 2px rgba(0,0,0,.45); }
     @media (prefers-reduced-motion: reduce) { .fill { transition: none; } }
   `];
@@ -505,12 +572,16 @@ export class SousChefProgressBars extends SousChefFeature {
     this.showNothing(!on.length);
     if (!on.length) return nothing;
     const names = probeNames(on);
-    const readings = this.option<boolean>("values") !== false;
-    return html`<div class="bars">
+    // Text: off, left or right of each bar (once a switch: on was left)
+    const choice = this.option<string | boolean>("values");
+    const side = choice === false || choice === "off" ? "off" : choice === "right" ? "right" : "left";
+    const readings = side !== "off";
+    const n = on.length;
+    return html`<div class="bars" style=${styleMap({ "--rows": String(n), "--bar": n > 2 ? "4px" : "6px", "--text": n > 3 ? "10px" : n > 2 ? "11px" : "12px" })}>
       ${on.map((p) => {
         const bar = cookBar(hass, p);
         const title = `${names.get(p.device)}: ${bar.label || "no reading"}`;
-        return html`<button type="button" class="cell" style=${styleMap({ "--c": colorOf(p) })} role="progressbar"
+        return html`<button type="button" class="cell ${side}" style=${styleMap({ "--c": colorOf(p) })} role="progressbar"
           aria-valuemin="0" aria-valuemax="100" aria-valuenow=${Math.round(bar.fill)} title=${title} aria-label=${title}
           @click=${() => moreInfo(this, p.entities.progress)}>
           ${readings ? html`<span class="reading num">${bar.label.replace(/ °[FC]?$/, "°")}</span>` : nothing}

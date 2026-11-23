@@ -89,8 +89,9 @@ export function probeConfig(probe: Probe, name: string, features: Config[] = def
     state_content: ["state", "doneness", "status"],
     features,
     features_position: "bottom",
+    // A tap on the icon lists the foods (the card's own list over it, see tile.ts); elsewhere, nothing
     tap_action: { action: "none" },
-    icon_tap_action: { action: "more-info" },
+    icon_tap_action: { action: "none" },
   };
 }
 

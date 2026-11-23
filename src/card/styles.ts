@@ -38,24 +38,6 @@ export const cardStyles = css`
   /* Flat and Console: each control on a plain patch of the finish */
   .solid { --sc-backing: var(--sc-base); }
   .probes { display: grid; }
-  /* Bull's handle along the bottom edge of the grill (its title row when folded), taking no room: a polished
-     chrome tube, its ends bent back to the hood on two standoffs, casting its shadow on the stainless */
-  .handle { position: relative; height: 0; pointer-events: none; }
-  .handle > span { position: absolute; }
-  .handle .post {
-    bottom: 1px; width: 12px; height: 8px; border-radius: 2px 2px 5px 5px;
-    background: linear-gradient(90deg, #6d747a 0%, #c9ced2 30%, #f3f5f6 50%, #b3b9be 72%, #5f666c 100%);
-    box-shadow: 0 2px 3px rgba(0,0,0,.35);
-  }
-  .handle .post:first-child { left: calc(10% + 18px); }
-  .handle .post + .post { right: calc(10% + 18px); }
-  .handle .bar {
-    left: 10%; right: 10%; bottom: 3px; height: 8px; border-radius: 4px;
-    background:
-      linear-gradient(90deg, rgba(0,0,0,.28), transparent 3%, transparent 97%, rgba(0,0,0,.28)),
-      linear-gradient(180deg, #4e555b 0%, #a9b0b6 12%, #ffffff 30%, #e3e7ea 42%, #8e959b 62%, #c8cdd1 78%, #f0f2f4 86%, #5b6268 100%);
-    box-shadow: 0 3px 4px -1px rgba(0,0,0,.35), 0 1px 1px rgba(0,0,0,.4);
-  }
   .panel:not(.open) .probes { display: none; }
 `;
 
@@ -68,6 +50,8 @@ export const tileStyles = css`
     border: 2px solid var(--sc-badge-ring, var(--ha-card-background, var(--card-background-color, #fff)));
   }
   .badge.on { display: grid; }
+  /* A probe's food type list, over its icon (placed by the tile) */
+  .food { position: absolute; z-index: 2; display: none; margin: 0; padding: 0; border: 0; border-radius: 50%; opacity: 0; cursor: pointer; font: inherit; }
   .badge ha-icon { --mdc-icon-size: 12px; display: flex; }
 `;
 

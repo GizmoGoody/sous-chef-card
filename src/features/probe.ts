@@ -3,11 +3,11 @@
 // - Sous Chef cook: the food type, the target (or its doneness) and the chart
 // - Sous Chef channels: each channel from the tip, by its heat, against the reference
 // - Sous Chef timing: the rate, and the time left (or the rest once done)
-import { css, html, nothing, type TemplateResult } from "lit";
+import { css, html, nothing, unsafeCSS, type TemplateResult } from "lit";
 import { styleMap } from "lit/directives/style-map.js";
 import { showChartDialog } from "../chart/dialog";
 import { FEATURES } from "../const";
-import { known, moreInfo, type HassEntity } from "../ha";
+import { moreInfo, type HassEntity } from "../ha";
 import {
   channelReadings, colorOf, cookBar, iconColorOf, CUSTOM, doneAtOf, durationText, internalSensor, rateIcon, rateText,
   statusOf, valueOf, whole,
@@ -16,6 +16,9 @@ import { readout, SousChefFeature } from "./base";
 import { ITEM_MIN } from "./rows";
 import { numberField } from "./field";
 import { featureStyles } from "./styles";
+
+// The tip's length (px), as drawn
+const TIP = 30;
 
 /** The cook's bar: filled to its progress in the probe's color, internal → target on it; striped while stalled, with the goal marked once past it. */
 export class SousChefProgress extends SousChefFeature {
@@ -29,12 +32,12 @@ export class SousChefProgress extends SousChefFeature {
       background: var(--sc-backing, var(--sc-scrim, transparent)); color: var(--sc-text, var(--primary-text-color));
     }
     .bar::before { content: ""; position: absolute; inset: 0; background: var(--c); opacity: .2; }
-    .fill { position: absolute; top: 0; bottom: 0; left: 0; background: var(--c); transition: width 600ms ease-in-out; }
+    .fill { position: absolute; top: 0; bottom: 0; left: 0; background: var(--c); opacity: .55; transition: width 600ms ease-in-out; }
     .fill.stalled { background: repeating-linear-gradient(135deg, rgba(255,255,255,.35) 0 6px, transparent 6px 12px), var(--c); }
     .goal { position: absolute; top: 8px; bottom: 8px; width: 3px; margin-left: -1px; border-radius: 2px; background: rgba(0,0,0,.55); }
     .label {
       position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 0 12px; font-size: var(--ha-font-size-m, 14px);
-      font-weight: 500; text-shadow: 0 1px 2px rgba(0,0,0,.6); color: #fff;
+      font-weight: 500; color: var(--sc-text, var(--primary-text-color));
     }
     :host([sc-console]) .bar { box-shadow: inset 0 2px 4px rgba(0,0,0,.45), inset 0 -1px 0 rgba(255,255,255,.18); }
     @media (prefers-reduced-motion: reduce) { .fill { transition: none; } }
@@ -63,61 +66,43 @@ function optionsOf(hass: SousChefFeature["hass"], stateObj?: HassEntity): { valu
 }
 
 /**
- * The food type (its icon; a tap lists the foods), the target (typed in
- * with Custom; with a doneness, its temperature, and a tap lists the
- * doneness levels), and the chart, which opens the chart view.
+ * The target, with the doneness: a tap lists the doneness levels; Custom
+ * opens the keyboard for a temperature, and at Custom a press and slide
+ * changes it. And the chart, which opens the chart view. The food type is
+ * the tile's icon.
  */
 export class SousChefCook extends SousChefFeature {
   static override tag = FEATURES.cook;
   static override pickerName = "Sous Chef cook";
-  static override controls: [string, string][] = [["food", "Food type"], ["target", "Target or doneness"], ["chart", "Chart view"]];
+  static override controls: [string, string][] = [["target", "Target or doneness"], ["chart", "Chart view"]];
 
   static override styles = [featureStyles, css`
-    .menu { font-size: var(--ha-font-size-m, 14px); }
+    .field.menu { font-size: var(--ha-font-size-m, 14px); }
   `];
-
-  private _choose(entityId: string | undefined, option: string): void {
-    if (entityId && option) this.call("select", "select_option", { entity_id: entityId, option });
-  }
-
-  private _menu(entityId: string | undefined, stateObj: HassEntity | undefined, label: string): TemplateResult {
-    return html`<select aria-label=${label} ?disabled=${!known(stateObj)} .value=${stateObj?.state ?? ""}
-      @click=${(ev: Event) => ev.stopPropagation()}
-      @change=${(ev: Event) => this._choose(entityId, (ev.target as HTMLSelectElement).value)}>
-      ${optionsOf(this._hass, stateObj).map((o) => html`<option value=${o.value} ?selected=${o.value === stateObj?.state}>${o.label}</option>`)}
-    </select>`;
-  }
 
   protected override render(): TemplateResult | typeof nothing {
     const hass = this._hass!, probe = this.probe;
     this.showNothing(!probe || !this.chosen().length);
     if (!probe || !this.chosen().length) return nothing;
     const e = probe.entities;
-    const food = e.food_type ? hass.states[e.food_type] : undefined;
     const doneness = e.doneness ? hass.states[e.doneness] : undefined;
-    const target = valueOf(hass, e.target);
     const custom = !doneness || doneness.state === CUSTOM;
-    const foodName = food ? hass.formatEntityState(food) : "";
     const level = doneness ? hass.formatEntityState(doneness) : "";
-    const chosen = this.chosen();
     const controls: Record<string, () => unknown> = {
-      food: () => food ? html`<label class="key" data-min=${ITEM_MIN.key} title="Food type: ${foodName}">
-        <ha-state-icon .hass=${hass} .stateObj=${food}></ha-state-icon>
-        ${this._menu(e.food_type, food, "Food type")}
-      </label>` : nothing,
-      target: () => custom
-        ? numberField(hass, e.target, { placeholder: "Target", title: "Target: type it in" })
-        : html`<label class="field menu" data-min=${ITEM_MIN.field} title="Doneness: ${level}${target !== undefined ? `, ${whole(target)}°` : ""}">
-            ${target !== undefined ? html`<span class="num">${whole(target)}°</span>` : html`<span class="note">Target</span>`}
-            ${this._menu(e.doneness, doneness, "Doneness")}
-          </label>`,
+      target: () => doneness
+        ? numberField(hass, e.target, {
+          placeholder: "Target", title: `Doneness: ${level}`, slide: custom,
+          menu: { options: optionsOf(hass, doneness), selected: doneness.state, custom: CUSTOM,
+            choose: (option) => this.call("select", "select_option", { entity_id: e.doneness, option }) },
+        })
+        : numberField(hass, e.target, { placeholder: "Target", title: "Target" }),
       chart: () => html`<button type="button" class="key" data-min=${ITEM_MIN.key} title="Chart view: pick from a chart" aria-label="Chart view"
         ?disabled=${!e.source || !e.food_type || !e.doneness}
         @click=${() => showChartDialog(this, { name: probe.name, source: e.source, food_type: e.food_type, doneness: e.doneness, target: e.target })}>
         <ha-icon icon="mdi:book-open-variant"></ha-icon>
       </button>`,
     };
-    return html`<div class="row" style=${styleMap({ "--c": colorOf(probe), "--c-icon": iconColorOf(probe) })}>${chosen.map((id) => controls[id]())}</div>`;
+    return html`<div class="row" style=${styleMap({ "--c": colorOf(probe), "--c-icon": iconColorOf(probe) })}>${this.chosen().map((id) => controls[id]())}</div>`;
   }
 }
 
@@ -135,27 +120,17 @@ export class SousChefChannels extends SousChefFeature {
   }];
 
   static override styles = [featureStyles, css`
-    /* The outline: a sharp tip, then the body with a rounded end */
-    .probe { position: relative; isolation: isolate; display: flex; align-items: stretch; min-width: 0; height: var(--feature-height, 42px); color: var(--sc-text, var(--primary-text-color)); }
-    /* The fill: the coldest channel faintest, the hottest strongest, in the probe's color */
-    .probe::before {
-      content: ""; position: absolute; inset: 0; z-index: -1; background: var(--heat);
-      border-radius: 0 var(--feature-border-radius, 12px) var(--feature-border-radius, 12px) 0;
-      clip-path: polygon(34px 0, 100% 0, 100% 100%, 34px 100%, 0 50%);
-    }
-    .probe .tip { flex: none; width: 34px; height: 100%; overflow: visible; }
-    .probe .tip path { fill: none; stroke: var(--c); stroke-width: 1.5px; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-    .probe .body {
-      flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 2px; padding: 0 8px 0 0;
-      border: 1.5px solid var(--c); border-left: 0; border-radius: 0 var(--feature-border-radius, 12px) var(--feature-border-radius, 12px) 0;
-    }
+    /* A read-out shaped like the probe: its tip at the left, sharp; filled by each channel's heat */
+    .probe { justify-content: center; gap: 2px; padding: 0 10px 0 22px; cursor: default;
+      clip-path: polygon(${unsafeCSS(TIP)}px 0, 100% 0, 100% 100%, ${unsafeCSS(TIP)}px 100%, 0 50%); }
+    .probe.field::before { background: var(--heat); opacity: 1; }
     .ch { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; padding: 0 2px; border: 0; margin: 0;
       background: none; font: inherit; font-size: 13px; font-weight: 500; color: inherit; cursor: pointer; outline: none; }
     .ch .value { line-height: 14px; min-height: 14px; }
     .ch .delta { min-height: 11px; font-size: 10px; font-weight: 400; line-height: 11px; color: var(--secondary-text-color); }
     .sep { align-self: center; line-height: 14px; color: var(--secondary-text-color); }
     /* With a difference under a number, each dot stays level with the numbers */
-    .body.deltas .sep { margin-bottom: 11px; }
+    .probe.deltas .sep { margin-bottom: 11px; }
   `];
 
   protected override render(): TemplateResult | typeof nothing {
@@ -170,33 +145,28 @@ export class SousChefChannels extends SousChefFeature {
     const shown = (d?: number) => d !== undefined && d > 1;
     const anyDelta = deltas && channels.some((ch) => !ch.reference && shown(ch.delta));
     return html`<div class="row" style=${styleMap({ "--c": colorOf(probe) })}>
-      <div class="probe" data-min=${ITEM_MIN.wide} role="group" aria-label="Channels" style=${styleMap({ "--heat": heatFill(channels) })}>
-        <svg class="tip" viewBox="0 0 34 42" preserveAspectRatio="none" aria-hidden="true"><path d="M34.5 0.75 L0.75 21 L34.5 41.25"></path></svg>
-        <div class="body ${anyDelta ? "deltas" : ""}">
-          ${channels.map((ch, i) => {
-            const title = `Channel ${i + 1}${ch.tip ? ", at the tip" : ""}: ${ch.value === undefined ? "unknown"
-              : `${whole(ch.value)} ${unit}${ch.reference ? ", the reference" : `, ${ch.delta} ${unit} above the reference`}`}`;
-            return html`${i ? html`<span class="sep" aria-hidden="true">·</span>` : nothing}<button type="button" class="ch" title=${title} aria-label=${title}
-              @click=${() => moreInfo(this, ch.id)}>
-              <span class="value num">${ch.value === undefined ? "–" : whole(ch.value)}</span>
-              ${anyDelta ? html`<span class="delta">${ch.reference || !shown(ch.delta) ? "" : `+${ch.delta}°`}</span>` : nothing}
-            </button>`;
-          })}
-        </div>
+      <div class="field readout probe ${anyDelta ? "deltas" : ""}" data-min=${ITEM_MIN.wide} role="group" aria-label="Channels"
+        style=${styleMap({ "--heat": heatFill(channels) })}>
+        ${channels.map((ch, i) => {
+          const title = `Channel ${i + 1}${ch.tip ? ", at the tip" : ""}: ${ch.value === undefined ? "unknown"
+            : `${whole(ch.value)} ${unit}${ch.reference ? ", the reference" : `, ${ch.delta} ${unit} above the reference`}`}`;
+          return html`${i ? html`<span class="sep" aria-hidden="true">·</span>` : nothing}<button type="button" class="ch" title=${title} aria-label=${title}
+            @click=${() => moreInfo(this, ch.id)}>
+            <span class="value num">${ch.value === undefined ? "–" : whole(ch.value)}</span>
+            ${anyDelta ? html`<span class="delta">${ch.reference || !shown(ch.delta) ? "" : `+${ch.delta}°`}</span>` : nothing}
+          </button>`;
+        })}
       </div>
     </div>`;
   }
 }
 
-/** The channels' heat across the outline: the tip's color from the point, then each channel's at its place, blended between. */
+/** The channels' heat across the read-out: the tip's color from the point, then each channel's at its place, blended between. */
 function heatFill(channels: { heat: number }[]): string {
   const tint = (heat: number) => `color-mix(in srgb, var(--c) ${Math.round((0.14 + 0.5 * heat) * 100)}%, transparent)`;
   const stops = channels.map((ch, i) => `${tint(ch.heat)} calc(${TIP}px + (100% - ${TIP}px) * ${((i + 0.5) / channels.length).toFixed(3)})`);
   return `linear-gradient(90deg, ${tint(channels[0]?.heat ?? 0)} 0, ${stops.join(", ")})`;
 }
-
-// The tip's length (px), as drawn
-const TIP = 34;
 
 /** The rate, and the time left; once done, the rest the chart asks for. */
 export class SousChefTiming extends SousChefFeature {

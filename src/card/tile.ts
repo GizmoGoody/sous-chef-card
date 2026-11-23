@@ -204,7 +204,33 @@ export class SousChefTile extends LitElement {
     const look = badge ? BADGES[badge] : undefined;
     return html`${this._tile ?? nothing}<span class=${classMap({ badge: true, on: !!look })} role="img" aria-label=${badge ?? nothing}
       title=${badge ? badge[0].toUpperCase() + badge.slice(1) : ""} style=${styleMap({ background: look?.color })}>
-      ${look ? html`<ha-icon .icon=${look.icon}></ha-icon>` : nothing}</span>`;
+      ${look ? html`<ha-icon .icon=${look.icon}></ha-icon>` : nothing}</span>${this.kind === "probe" ? this._foodMenu() : nothing}`;
+  }
+
+  /** A probe's icon is its food type's list: the browser's own list, over the icon. */
+  private _foodMenu(): TemplateResult | typeof nothing {
+    const hass = this._hass, id = this._config?.entity;
+    const stateObj = id && id.startsWith("select.") ? hass?.states[id] : undefined;
+    if (!hass || !stateObj) return nothing;
+    const options: string[] = Array.isArray(stateObj.attributes.options) ? stateObj.attributes.options : [];
+    return html`<select class="food" aria-label="Food type" title="Food type: ${hass.formatEntityState(stateObj)}" .value=${stateObj.state}
+      @click=${(ev: Event) => ev.stopPropagation()}
+      @change=${(ev: Event) => hass.callService("select", "select_option", { entity_id: id, option: (ev.target as HTMLSelectElement).value })}>
+      ${options.map((o) => html`<option value=${o} ?selected=${o === stateObj.state}>${hass.formatEntityState(stateObj, o)}</option>`)}
+    </select>`;
+  }
+
+  /** The food type's list exactly over the probe's icon. */
+  private _placeFood(icon?: Element | null): void {
+    const menu = this.renderRoot.querySelector<HTMLElement>("select.food");
+    if (!menu || !icon) return;
+    const outer = this.getBoundingClientRect(), box = icon.getBoundingClientRect();
+    if (!box.width || !this.offsetWidth) return;
+    const scale = outer.width / this.offsetWidth || 1;
+    Object.assign(menu.style, {
+      left: `${(box.left - outer.left) / scale}px`, top: `${(box.top - outer.top) / scale}px`,
+      width: `${box.width / scale}px`, height: `${box.height / scale}px`, display: "block",
+    });
   }
 
   protected override updated(): void {
@@ -238,6 +264,7 @@ export class SousChefTile extends LitElement {
     if (this.kind === "probe") this._placeFeatures();
     else this._fullWidth();
     this._placeBadge(icon);
+    if (this.kind === "probe") this._placeFood(icon);
   }
 
   /** The features style on this card's features: Console makes their keys press in. */

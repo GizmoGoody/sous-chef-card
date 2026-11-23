@@ -3,8 +3,8 @@ import { featureForm } from "../../src/features/form";
 import { checkConfig, grillConfig, minimal, probeConfig, probeFeaturesOf, probeTilesOf, stubConfig, tileConfig } from "../../src/card/options";
 import type { HomeAssistant } from "../../src/ha";
 import {
-  allProbes, ambients, axisRange, channelReadings, durationText, grillBadge, grillLine, internalSensor, probeDevices, probeLine, probeOf,
-  rateText, shortNames, statusOf, statusText, trendOf,
+  aheadText, allProbes, ambients, axisRange, channelReadings, durationText, grillBadge, grillLine, internalSensor, probeDevices, probeLine, probeOf,
+  horizons, rateText, shortNames, statusOf, statusText, trendOf,
 } from "../../src/sous-chef";
 
 // A kit as Sous Chef makes it: an RFX probe (channels 1 to 4, internal = the
@@ -248,4 +248,17 @@ describe("Sous Chef probes", () => {
     expect(probeTilesOf({ ...config, features: [] })).toBeUndefined();
   });
   it("is on a new card", () => expect(stubConfig(kit()).features.map((f: { type: string }) => f.type)).toContain("custom:sous-chef-probe-tiles"));
+});
+
+describe("the projections' spans", () => {
+  it("go to the targets, then halve while past 15 minutes, then 15, 10 and 5", () => {
+    expect(horizons(150)).toEqual([150, 75, 38, 19, 15, 10, 5]);
+    expect(horizons(60)).toEqual([60, 30, 15, 10, 5]);
+    expect(horizons(12)).toEqual([12, 10, 5]);
+  });
+  it("are said in hours and minutes", () => {
+    expect(aheadText(150)).toBe("+2 h 30 min");
+    expect(aheadText(60)).toBe("+1 h");
+    expect(aheadText(15)).toBe("+15 min");
+  });
 });

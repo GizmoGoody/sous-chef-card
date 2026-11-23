@@ -1,6 +1,6 @@
 // The styles: each a grill's finish, drawn behind the whole card in CSS.
 // Stainless steel is brushed satin (Napoleon, Lynx, Blaze, Recteq); Bull is
-// its warmer satin stainless, with the chrome handle of its hood; black porcelain is
+// its warmer satin stainless; black porcelain is
 // enamel (Weber kettles, Traeger Ironwood and Timberline); Traeger bronze is
 // the Pro's powder coat; Big Green Egg and Kamado Joe are their glazed
 // ceramics, Big Green Egg's pebbled.
@@ -16,8 +16,6 @@ export interface Finish {
   border: string;
   // The history graph's screen: its background (and as a solid color, for the graph's tooltip), text and grid lines
   screen: { background: string; solid: string; text: string; secondary: string; grid: string };
-  // A chrome handle under the grill, as on Bull's hood
-  handle?: boolean;
 }
 
 /** An SVG texture as a CSS image. */
@@ -53,11 +51,11 @@ export const FINISHES: Record<string, Finish> = {
     screen: LIGHT_SCREEN,
   },
   bull: {
-    // Bull's satin brushed stainless, warmer and more even than Stainless steel, with its chrome handle
+    // Bull's satin brushed stainless, warmer and more even than Stainless steel
     surface: `${POLISHED} 0 0 / 600px 300px, `
       + "linear-gradient(176deg, #dcdbd7 0%, #cfceca 25%, #d8d7d3 45%, #c3c2be 70%, #cdccc8 100%)",
     tone: "light", base: "#c4c3bf", border: "rgba(0,0,0,.3)",
-    screen: LIGHT_SCREEN, handle: true,
+    screen: LIGHT_SCREEN,
   },
   black: {
     surface: "linear-gradient(165deg, #3a3c40 0%, #16171a 36%, #0b0c0e 70%, #26282c 100%)",
