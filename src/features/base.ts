@@ -40,6 +40,12 @@ export class SousChefFeature extends LitElement {
     return featureForm(this.controls, this.options);
   }
 
+  /** Whether Home Assistant's feature picker offers it for a tile card's entity. */
+  static supports(hass: HomeAssistant | undefined, context?: FeatureContext): boolean {
+    if (!hass || !context?.entity_id) return false;
+    return this.forKind === "grill" ? !!ambientOf(hass, context.entity_id) : !!probeOfEntity(hass, context.entity_id);
+  }
+
   protected _config?: Config;
   protected _hass?: HomeAssistant;
   protected _context?: FeatureContext;
