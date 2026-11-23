@@ -35,10 +35,11 @@ export const PROBE_FEATURES = [FEATURES.progress, FEATURES.cook, FEATURES.channe
 export const STYLES: [string, string][] = [
   ["none", "None (theme)"],
   ["stainless", "Stainless steel"],
+  ["bull", "Bull"],
   ["black", "Black porcelain"],
-  ["bronze", "Bronze"],
-  ["green", "Green ceramic"],
-  ["red", "Red ceramic"],
+  ["bronze", "Traeger bronze"],
+  ["big_green_egg", "Big Green Egg"],
+  ["kamado_joe", "Kamado Joe"],
 ];
 // The same keys and values as the xTool, Prusa and SVS Subwoofer cards
 export const FEATURES_STYLES: [string, string][] = [["match", "Match style"], ["flat", "Flat"], ["console", "Console"]];

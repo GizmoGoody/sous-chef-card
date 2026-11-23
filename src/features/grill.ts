@@ -5,7 +5,7 @@
 import { css, html, nothing, svg, type TemplateResult } from "lit";
 import { styleMap } from "lit/directives/style-map.js";
 import { FEATURES, GRILL_COLOR } from "../const";
-import { cssColor, entityName, findDeep, moreInfo, numberOf, toHex, type Config, type HomeAssistant } from "../ha";
+import { cssColor, darkMode, dim, entityName, findDeep, moreInfo, numberOf, toHex, type Config, type HomeAssistant } from "../ha";
 import {
   allProbes, axisRange, colorOf, cookBar, doneAtOf, internalSensor, internalValue, isActive, probeNames, rateIcon, rateText, statusOf, trendOf,
   valueOf, whole, type Probe,
@@ -28,8 +28,8 @@ export class SousChefProbes extends SousChefFeature {
   static override pickerName = "Sous Chef probes";
   static override forKind = "grill" as const;
   static override options = [{
-    name: "show", label: "Show on a probe that is on", default: "temperatures",
-    selector: { select: { mode: "dropdown", options: [{ value: "temperatures", label: "Its temperature" }, { value: "icons", label: "The probe icon" }] } },
+    name: "show", label: "Keys show", default: "temperatures",
+    selector: { select: { mode: "dropdown", options: [{ value: "temperatures", label: "Temperature while on" }, { value: "icons", label: "Icon only" }] } },
   }];
 
   static override styles = [featureStyles, css`
@@ -172,7 +172,7 @@ interface Projection {
 /**
  * The grill and every probe that is on, in Home Assistant's own history
  * graph card, as the Prusa Connect card's history: each probe in its color
- * and its target in the same color, the grill in orange. The key at the
+ * and its target the same color dimmed, the grill in orange. The key at the
  * top right shows projected temperatures: Home Assistant's graph ends at
  * now, so the hour ahead is drawn beside it, on the graph's own scale, each
  * probe dashed toward its target (reached at its Done at time) and the
@@ -296,7 +296,7 @@ export class SousChefHistory extends SousChefFeature {
       const color = hex(colorOf(p));
       if (reading) entities.push({ entity: reading, name: names.get(p.device), color });
       if (p.entities.target && valueOf(hass, p.entities.target) !== undefined) {
-        entities.push({ entity: p.entities.target, name: `${names.get(p.device)} target`, color });
+        entities.push({ entity: p.entities.target, name: `${names.get(p.device)} target`, color: dim(color, this._darkScreen()) });
       }
     }
     const c = this._config!;
@@ -357,6 +357,14 @@ export class SousChefHistory extends SousChefFeature {
       color: text, "--primary-text-color": text, "--secondary-text-color": get("--sc-screen-secondary"),
       "--divider-color": get("--sc-screen-grid"), "--card-background-color": get("--sc-screen-solid"),
     };
+  }
+
+  /** Whether the graph is on a dark screen: the finish's, or the theme's. */
+  private _darkScreen(): boolean {
+    const solid = getComputedStyle(this).getPropertyValue("--sc-screen-solid").trim();
+    if (!/^#[0-9a-f]{6}$/i.test(solid)) return darkMode(this._hass);
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(solid.slice(i, i + 2), 16));
+    return 0.299 * r + 0.587 * g + 0.114 * b < 128;
   }
 
   protected override render(): TemplateResult | typeof nothing {
@@ -447,29 +455,33 @@ export class SousChefHistory extends SousChefFeature {
   }
 }
 
+// Probes to a row in the grill's progress; more go on to another row
+const BARS_PER_ROW = 4;
+
 /**
- * A thin bar for each probe that is on, all in one feature: filled to its
- * cook's progress in its color, striped while stalled, with its reading
- * (68 → 130 °F) beside it. A tap on one shows its progress.
+ * A thin bar for each probe that is on, side by side, up to four to a row:
+ * filled to its cook's progress in its color, striped while stalled, with
+ * its reading (68 → 130°) over it. A tap on one shows its progress.
  */
 export class SousChefProgressBars extends SousChefFeature {
   static override tag = FEATURES.bars;
-  static override pickerName = "Sous Chef progress bars";
+  static override pickerName = "Sous Chef progress";
   static override forKind = "grill" as const;
   static override options = [
-    { name: "readings", label: "Readings", helper: "Each probe's temperature and target beside its bar", default: true, selector: { boolean: {} } },
+    { name: "readings", label: "Readings", helper: "Each probe's temperature and target over its bar", default: true, selector: { boolean: {} } },
   ];
 
   static override styles = [featureStyles, css`
-    .bars { display: flex; flex-direction: column; gap: 6px; padding: 2px 0; }
-    .line { display: flex; align-items: center; gap: 10px; height: 18px; padding: 0; border: 0; margin: 0; background: none;
-      font: inherit; color: var(--sc-text, var(--primary-text-color)); cursor: pointer; text-align: start; }
-    .bar { position: relative; flex: 1 1 auto; height: 8px; border-radius: 4px; overflow: hidden; }
+    .bars { display: grid; grid-template-columns: repeat(var(--columns, 1), minmax(0, 1fr)); grid-auto-rows: var(--feature-height, 42px);
+      gap: var(--ha-card-feature-gap, 12px) var(--feature-button-spacing, 12px); }
+    .cell { display: flex; flex-direction: column; justify-content: center; gap: 5px; min-width: 0; padding: 0; border: 0; margin: 0;
+      background: none; font: inherit; color: var(--sc-text, var(--primary-text-color)); cursor: pointer; outline: none; }
+    .bar { position: relative; flex: none; height: 6px; border-radius: 3px; overflow: hidden; }
     .bar::before { content: ""; position: absolute; inset: 0; background: var(--c); opacity: .22; }
     .fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 4px; background: var(--c); transition: width 600ms ease-in-out; }
     .fill.stalled { background: repeating-linear-gradient(135deg, rgba(255,255,255,.4) 0 4px, transparent 4px 8px), var(--c); }
     .goal { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: rgba(0,0,0,.6); }
-    .reading { flex: 0 0 auto; min-width: 84px; text-align: end; font-size: var(--ha-font-size-s, 12px); }
+    .reading { font-size: var(--ha-font-size-s, 12px); font-weight: 500; text-align: center; }
     :host([sc-console]) .bar { box-shadow: inset 0 1px 2px rgba(0,0,0,.45); }
     @media (prefers-reduced-motion: reduce) { .fill { transition: none; } }
   `];
@@ -486,16 +498,16 @@ export class SousChefProgressBars extends SousChefFeature {
     if (!on.length) return nothing;
     const names = probeNames(on);
     const readings = this.option<boolean>("readings") !== false;
-    return html`<div class="bars">
+    return html`<div class="bars" style=${styleMap({ "--columns": String(Math.ceil(on.length / Math.ceil(on.length / BARS_PER_ROW))) })}>
       ${on.map((p) => {
         const bar = cookBar(hass, p);
         const title = `${names.get(p.device)}: ${bar.label || "no reading"}`;
-        return html`<button type="button" class="line" style=${styleMap({ "--c": colorOf(p) })} role="progressbar"
+        return html`<button type="button" class="cell" style=${styleMap({ "--c": colorOf(p) })} role="progressbar"
           aria-valuemin="0" aria-valuemax="100" aria-valuenow=${Math.round(bar.fill)} title=${title} aria-label=${title}
           @click=${() => moreInfo(this, p.entities.progress)}>
+          ${readings ? html`<span class="reading num">${bar.label.replace(/ °[FC]?$/, "°")}</span>` : nothing}
           <span class="bar"><span class="fill ${bar.stalled ? "stalled" : ""}" style=${styleMap({ width: `${bar.fill}%` })}></span>
             ${bar.goal !== undefined ? html`<span class="goal" style=${styleMap({ left: `${bar.goal}%` })}></span>` : nothing}</span>
-          ${readings ? html`<span class="reading num">${bar.label}</span>` : nothing}
         </button>`;
       })}
     </div>`;

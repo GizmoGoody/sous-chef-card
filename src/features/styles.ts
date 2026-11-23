@@ -12,18 +12,22 @@ const enabled = unsafeCSS("var(--feature-color, var(--state-icon-color, var(--pr
 
 // Console (the sc-console attribute): the keys press in; read-outs and fields are set into the surface
 const consoleStyles = css`
-  :host([sc-console]) .key {
+  /* The shading lies over the key's color (its ::after), so a key that is on, filled, still shows it is pressed in */
+  :host([sc-console]) .key { box-shadow: 0 2px 3px rgba(0,0,0,.5); transition: transform 120ms ease-in-out, box-shadow 120ms ease-in-out; }
+  :host([sc-console]) .key::after {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
     background-image: linear-gradient(180deg, rgba(255,255,255,.35), rgba(255,255,255,0) 45%, rgba(0,0,0,.18));
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 2px rgba(0,0,0,.3), 0 2px 3px rgba(0,0,0,.5);
-    transition: transform 120ms ease-in-out, box-shadow 120ms ease-in-out;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 2px rgba(0,0,0,.3);
   }
   :host([sc-console]) .key:not(:disabled):active,
-  :host([sc-console]) .key:not(:disabled)[aria-pressed="true"] {
-    transform: translateY(1px);
-    background-image: linear-gradient(180deg, rgba(0,0,0,.28), rgba(0,0,0,.06) 40%, rgba(255,255,255,.1));
-    box-shadow: inset 0 3px 6px rgba(0,0,0,.55), inset 0 1px 2px rgba(0,0,0,.4), inset 0 -1px 0 rgba(255,255,255,.25);
+  :host([sc-console]) .key:not(:disabled)[aria-pressed="true"] { transform: translateY(1px); box-shadow: none; }
+  :host([sc-console]) .key:not(:disabled):active::after,
+  :host([sc-console]) .key:not(:disabled)[aria-pressed="true"]::after {
+    background-image: linear-gradient(180deg, rgba(0,0,0,.3), rgba(0,0,0,.08) 40%, rgba(255,255,255,.1));
+    box-shadow: inset 0 3px 6px rgba(0,0,0,.6), inset 0 1px 2px rgba(0,0,0,.45), inset 0 -1px 0 rgba(255,255,255,.25);
   }
-  :host([sc-console]) .key:disabled, :host([sc-console]) .key.disabled { background-image: none; box-shadow: none; transform: none; }
+  :host([sc-console]) .key:disabled, :host([sc-console]) .key.disabled { box-shadow: none; transform: none; }
+  :host([sc-console]) .key:disabled::after, :host([sc-console]) .key.disabled::after { display: none; }
   :host([sc-console]) .field { box-shadow: inset 0 2px 4px rgba(0,0,0,.45), inset 0 -1px 0 rgba(255,255,255,.18); }
 `;
 
@@ -36,7 +40,6 @@ export const featureStyles = [rowStyles, css`
     color: var(--sc-text, var(--primary-text-color)); font-weight: var(--ha-font-weight-medium, 500);
   }
   .field::before { content: ""; position: absolute; inset: 0; background: var(--c, ${enabled}); opacity: .2; }
-  .field:focus-within { outline: 2px solid var(--c, ${enabled}); outline-offset: 2px; }
   .field > * { position: relative; }
   .field input {
     flex: 1 1 0; width: 0; min-width: 0; margin: 0; padding: 0; border: 0; outline: none; background: transparent;
@@ -58,7 +61,6 @@ export const featureStyles = [rowStyles, css`
   /* A read-out: a field that is only shown, its icon in its color; a tap opens it */
   .field.readout { cursor: pointer; gap: 6px; padding: 0 6px; font-size: var(--ha-font-size-s, 12px); min-width: 0; }
   .field.readout::before { background: var(--c, ${enabled}); opacity: var(--tint, .2); }
-  .field.readout:focus-visible { outline: 2px solid var(--c, ${enabled}); outline-offset: 2px; }
   .field.readout ha-state-icon, .field.readout ha-icon { margin-right: 0; }
   .field.readout span { font-variant-numeric: tabular-nums; }
   /* A field with a list (the doneness): the browser's own list, over the whole field */
@@ -78,7 +80,8 @@ export const featureStyles = [rowStyles, css`
   .key:hover::before { opacity: .35; }
   .key[aria-pressed="true"]::before { opacity: 1; }
   .key[aria-pressed="true"] { color: var(--sc-on-color, #fff); }
-  .key:focus-visible { outline: 2px solid var(--c, ${enabled}); outline-offset: 2px; }
+  /* No ring around a control that is tapped or typed in */
+  .key, .field, .field input, .field select, .key select { outline: none; }
   .key:disabled, .key.disabled { cursor: default; color: var(--disabled-text-color, #bdbdbd); }
   .key:disabled::before, .key:disabled:hover::before, .key.disabled::before { background: var(--disabled-color, #bdbdbd); opacity: .2; }
   .key > * { position: relative; }

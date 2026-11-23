@@ -1,8 +1,9 @@
 // The styles: each a grill's finish, drawn behind the whole card in CSS.
-// Stainless steel is brushed (Bull, Napoleon, Lynx, Blaze, Recteq); black
-// porcelain is enamel (Weber kettles, Traeger Ironwood and Timberline);
-// bronze is Traeger Pro's powder coat; the ceramics are glazed and speckled
-// (Big Green Egg, Kamado Joe).
+// Stainless steel is brushed satin (Napoleon, Lynx, Blaze, Recteq); Bull is
+// its polished stainless, with rivets at the corners; black porcelain is
+// enamel (Weber kettles, Traeger Ironwood and Timberline); Traeger bronze is
+// the Pro's powder coat; Big Green Egg and Kamado Joe are their glazed
+// ceramics, Big Green Egg's pebbled.
 
 export interface Finish {
   // The surface, as a CSS background
@@ -17,15 +18,49 @@ export interface Finish {
   screen: { background: string; solid: string; text: string; secondary: string; grid: string };
 }
 
-const SPECKLE = "radial-gradient(rgba(255,255,255,.07) 1px, transparent 1.6px) 0 0 / 7px 7px, "
-  + "radial-gradient(rgba(0,0,0,.16) 1px, transparent 1.6px) 3px 4px / 9px 9px, ";
+/** An SVG texture as a CSS image. */
+const svg = (body: string, w: number, h: number): string =>
+  `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}'>${body}</svg>`)}")`;
+
+/**
+ * Noise drawn in one color, its alpha from the noise: stretched along x it
+ * is the grain of brushed steel; even and fine, a glaze's pebbling.
+ */
+const noise = (id: string, frequency: string, octaves: number, seed: number, rgb: string, gain: number, cut: number): string =>
+  `<filter id='${id}' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='${frequency}' `
+  + `numOctaves='${octaves}' seed='${seed}' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 ${rgb} 0 0 0 0 ${rgb} 0 0 0 0 ${rgb} ${gain} 0 0 0 ${cut}'/></filter>`
+  + `<rect width='100%' height='100%' filter='url(#${id})'/>`;
+
+// Brushed: fine light and dark streaks along the grain
+const BRUSHED = svg(noise("l", "0.003 0.7", 3, 4, "1", 0.9, -0.36) + noise("d", "0.004 0.9", 3, 9, "0", 0.75, -0.34), 600, 300);
+// Polished: the grain barely there
+const POLISHED = svg(noise("l", "0.002 0.8", 2, 4, "1", 0.6, -0.26) + noise("d", "0.003 0.9", 2, 9, "0", 0.45, -0.21), 600, 300);
+// Pebbled glaze: small, uneven light and dark flecks, with no pattern to them
+const PEBBLED = svg(noise("l", "0.55", 2, 2, "1", 1.6, -1.0) + noise("d", "0.45", 2, 7, "0", 1.8, -0.95), 240, 240);
+const GLAZE = svg(noise("l", "0.6", 1, 5, "1", 1.6, -1.1), 240, 240);
+
+/** A rivet: a domed head, lit from the top left, at a point of the card. */
+const rivet = (at: string): string =>
+  `radial-gradient(circle 5px at ${at}, #ffffff 0, #e4e7ea 28%, #959ca4 66%, rgba(30,34,38,.6) 90%, transparent 100%)`;
+// Clear of the card's rounded corners
+const RIVETS = ["18px 18px", "calc(100% - 18px) 18px", "18px calc(100% - 18px)", "calc(100% - 18px) calc(100% - 18px)"].map(rivet).join(", ");
+
+const LIGHT_SCREEN = { background: "rgba(240,242,245,.88)", solid: "#f0f2f5", text: "rgba(0,0,0,.85)", secondary: "rgba(40,40,48,.7)", grid: "rgba(0,0,0,.14)" };
 
 export const FINISHES: Record<string, Finish> = {
   stainless: {
-    surface: "repeating-linear-gradient(90deg, rgba(255,255,255,.08) 0 1px, rgba(0,0,0,.035) 1px 2px, transparent 2px 4px), "
-      + "linear-gradient(165deg, #e6e9ec 0%, #aab1b7 35%, #d5d9dd 62%, #959ca3 100%)",
-    tone: "light", base: "#c9ced3", border: "rgba(0,0,0,.25)",
-    screen: { background: "rgba(240,242,245,.88)", solid: "#f0f2f5", text: "rgba(0,0,0,.85)", secondary: "rgba(40,40,48,.7)", grid: "rgba(0,0,0,.14)" },
+    // Satin: soft bands of light across the grain
+    surface: `${BRUSHED} 0 0 / 600px 300px, `
+      + "linear-gradient(180deg, #d9dde1 0%, #c3c8cd 22%, #dde1e4 40%, #b4bac0 63%, #cfd3d7 82%, #aeb4ba 100%)",
+    tone: "light", base: "#c6cbd0", border: "rgba(0,0,0,.25)",
+    screen: LIGHT_SCREEN,
+  },
+  bull: {
+    // Polished: bright, sharp bands of reflection, the grain fainter, and a rivet at each corner
+    surface: `${RIVETS}, ${POLISHED} 0 0 / 600px 300px, `
+      + "linear-gradient(172deg, #f7f9fa 0%, #c9ced3 14%, #8e959c 27%, #e9ecef 41%, #fbfcfd 47%, #b2b8be 60%, #e4e7ea 78%, #959ca3 100%)",
+    tone: "light", base: "#cdd2d6", border: "rgba(0,0,0,.3)",
+    screen: LIGHT_SCREEN,
   },
   black: {
     surface: "linear-gradient(165deg, #3a3c40 0%, #16171a 36%, #0b0c0e 70%, #26282c 100%)",
@@ -37,13 +72,15 @@ export const FINISHES: Record<string, Finish> = {
     tone: "dark", base: "#3e2915", border: "rgba(255,230,200,.18)",
     screen: { background: "rgba(30,19,9,.85)", solid: "#1e1309", text: "rgba(255,240,225,.92)", secondary: "rgba(240,215,190,.65)", grid: "rgba(255,220,180,.14)" },
   },
-  green: {
-    surface: `${SPECKLE}linear-gradient(165deg, #2d7040 0%, #174a28 55%, #1e5a33 100%)`,
+  big_green_egg: {
+    surface: `${PEBBLED} 0 0 / 240px 240px, linear-gradient(165deg, #2f7442 0%, #1a4f2b 52%, #215e36 100%)`,
     tone: "dark", base: "#143f22", border: "rgba(255,255,255,.14)",
     screen: { background: "rgba(6,28,14,.85)", solid: "#061c0e", text: "rgba(235,255,240,.92)", secondary: "rgba(200,235,210,.65)", grid: "rgba(200,255,220,.14)" },
   },
-  red: {
-    surface: `${SPECKLE}linear-gradient(165deg, #b8291f 0%, #7c1612 55%, #981e19 100%)`,
+  kamado_joe: {
+    // A smoother, glossier glaze
+    surface: `${GLAZE} 0 0 / 240px 240px, radial-gradient(120% 70% at 30% 0%, rgba(255,255,255,.18), transparent 60%), `
+      + "linear-gradient(165deg, #bd2c21 0%, #7e1712 55%, #9a1f19 100%)",
     tone: "dark", base: "#6a130f", border: "rgba(255,255,255,.16)",
     screen: { background: "rgba(36,6,4,.85)", solid: "#240604", text: "rgba(255,235,232,.92)", secondary: "rgba(255,205,200,.65)", grid: "rgba(255,210,205,.14)" },
   },

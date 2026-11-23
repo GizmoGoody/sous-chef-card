@@ -159,7 +159,7 @@ export class SousChefChannels extends SousChefFeature {
           : `${whole(ch.value)} ${unit}${ch.reference ? ", the reference" : `, ${ch.delta} ${unit} above the reference`}`}`;
         return readout(title, () => moreInfo(this, ch.id), html`
           <span class="value num">${ch.value === undefined ? "" : whole(ch.value)}</span>
-          ${deltas ? html`<span class="delta ${ch.reference ? "ref" : ""}">${ch.value === undefined ? "" : ch.reference ? "Ref" : `+${ch.delta}°`}</span>` : nothing}`,
+          ${deltas ? html`<span class="delta ${ch.reference ? "ref" : ""}">${ch.value === undefined || ch.reference || (ch.delta ?? 0) <= 1 ? "" : `+${ch.delta}°`}</span>` : nothing}`,
           { cls: `ch ${ch.tip ? "tip" : ""}`, min: CHANNEL_MIN, style: { "--tint": (0.14 + 0.5 * ch.heat).toFixed(2) } });
       })}
     </div>`;
@@ -204,9 +204,9 @@ export class SousChefTiming extends SousChefFeature {
     const timeTitle = done ? `Rest from the chart${rest > 0 ? `: ${rest} min` : ""}` : `Time left: ${left || "unknown"}`;
     const controls: Record<string, () => unknown> = {
       rate: () => readout(rateTitle, () => moreInfo(this, e.rate),
-        html`<ha-icon .icon=${rateIcon(rate, 0.3)}></ha-icon>${rate === undefined ? html`<span class="note">Rate</span>` : html`<span>${rateText(rate)}</span>`}`),
+        html`<ha-icon .icon=${rateIcon(rate, 0.3)}></ha-icon>${rate === undefined ? nothing : html`<span>${rateText(rate)}</span>`}`),
       time: () => readout(timeTitle, () => moreInfo(this, done ? e.doneness : e.done_at),
-        html`<ha-icon .icon=${done ? "mdi:timer-sand" : "mdi:timer-outline"}></ha-icon>${left ? html`<span>${left}</span>` : html`<span class="note">${done ? "Done" : "Time left"}</span>`}`),
+        html`<ha-icon .icon=${done ? "mdi:timer-sand" : "mdi:timer-outline"}></ha-icon>${left ? html`<span>${left}</span>` : done ? html`<span class="note">Done</span>` : nothing}`),
     };
     return html`<div class="row" style=${styleMap({ "--c": colorOf(probe) })}>${this.chosen().map((id) => controls[id]())}</div>`;
   }

@@ -104,7 +104,7 @@ export class SousChefChartDialog extends LitElement {
         .selector=${{ select: { mode: "dropdown", options } }} @value-changed=${this._sourceChanged}></ha-selector>
       ${chart?.url
         ? html`<ha-button class="link" appearance="plain" size="s" href=${chart.url} target="_blank" rel="noopener noreferrer">
-            Open the chart<ha-icon slot="end" icon="mdi:open-in-new"></ha-icon></ha-button>`
+            Source data<ha-icon slot="end" icon="mdi:open-in-new"></ha-icon></ha-button>`
         : nothing}
       ${chart ? this._renderList(chart) : nothing}`;
   }

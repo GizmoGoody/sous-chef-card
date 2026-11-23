@@ -70,7 +70,8 @@ export const ICON_SHEET = `
   .container::before { display: none !important; }
   img { width: auto !important; max-width: 126px; height: var(--sc-brand-height, 28px) !important; object-fit: contain !important;
     border-radius: var(--sc-brand-radius, 0) !important; padding: var(--sc-brand-padding, 0); box-sizing: content-box;
-    background: var(--sc-brand-backing, none); }`;
+    background: var(--sc-brand-backing, none);
+    filter: drop-shadow(0 -0.5px 0 rgba(255,255,255,.7)) drop-shadow(0 1px 0 rgba(0,0,0,.35)) drop-shadow(0 2px 2px rgba(0,0,0,.45)); }`;
 
 /** No divider between features, as in the Prusa Connect card. */
 export const PLAIN_SHEET = `
