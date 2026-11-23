@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { featureForm } from "../../src/features/form";
-import { checkConfig, grillConfig, minimal, probeConfig, stubConfig, tileConfig } from "../../src/card/options";
+import { checkConfig, grillConfig, minimal, probeConfig, probeFeaturesOf, probeTilesOf, stubConfig, tileConfig } from "../../src/card/options";
 import type { HomeAssistant } from "../../src/ha";
 import {
   allProbes, ambients, axisRange, channelReadings, durationText, grillBadge, grillLine, internalSensor, probeDevices, probeLine, probeOf,
@@ -233,4 +233,19 @@ describe("the collapsed grill", () => {
     expect(grillConfig({ ...config, features_position: "bottom" }, false).features).toEqual([]);
     expect(grillConfig(config).features).toHaveLength(2);
   });
+});
+
+describe("Sous Chef probes", () => {
+  const config = { type: "custom:sous-chef-card", entity: "sensor.grill_ambient", features_position: "inline",
+    features: [{ type: "custom:sous-chef-probes" }, { type: "custom:sous-chef-probe-tiles", features: [{ type: "custom:sous-chef-cook" }] }] };
+  it("is not among the grill's own features", () => {
+    expect(grillConfig(config).features).toEqual([{ type: "custom:sous-chef-probes" }]);
+    expect(grillConfig({ ...config, features: [config.features[1], config.features[0]] }, false).features).toEqual([{ type: "custom:sous-chef-probes" }]);
+  });
+  it("gives each probe its features, or the defaults", () => {
+    expect(probeFeaturesOf(probeTilesOf(config))).toEqual([{ type: "custom:sous-chef-cook" }]);
+    expect(probeFeaturesOf({ type: "custom:sous-chef-probe-tiles" })).toHaveLength(4);
+    expect(probeTilesOf({ ...config, features: [] })).toBeUndefined();
+  });
+  it("is on a new card", () => expect(stubConfig(kit()).features.map((f: { type: string }) => f.type)).toContain("custom:sous-chef-probe-tiles"));
 });

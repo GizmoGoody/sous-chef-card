@@ -34,8 +34,9 @@ A probe appears once it is on: taken off its charger, its key tapped, or its Act
 
 On the grill:
 
-- **Sous Chef probes**: a key for each probe beside the grill's name, sharing its width, pressed while it is on, with its temperature. Tap one to turn the probe on or off. Options: show the temperature or the probe icon.
-- **Sous Chef history**: Home Assistant's history graph of the last hour: the grill in orange, each probe that is on in its color, and its target the same color dimmed. The key at the top right shows projected temperatures for the hour ahead. The axis is in whole degrees, and on a style the graph takes the finish's colors. Options: the projections key, and Home Assistant's history graph options (hours to show, expand legend, Y axis).
+- **Sous Chef switches** (`custom:sous-chef-probes`): a key for each probe beside the grill's name, sharing its width, pressed while it is on, with its temperature. Tap one to turn the probe on or off. Options: show the temperature or the probe icon.
+- **Sous Chef probes** (`custom:sous-chef-probe-tiles`): a tile for each probe that is on, below the grill. Its editor is Home Assistant's own features editor: choose each probe's features, their order, and each one's options. Remove it, and the card shows no probe tiles.
+- **Sous Chef history**: Home Assistant's history graph of the last hour: the grill in orange, each probe that is on in its color, and its target the same color dimmed. The key at the top right shows projected temperatures for the hour ahead. The graph grows taller as more probes are on, and its legend is folded unless Expand legend is on. The axis is in whole degrees, and on a style the graph takes the finish's colors. Options: the projections key, and Home Assistant's history graph options (hours to show, expand legend, Y axis).
 - **Sous Chef progress**: a thin bar for each probe that is on, one above another, each across the card, filled to its progress in its color, with its temperature and target before it. Options: Values.
 - **Sous Chef ambient**: the grill's trend in degrees a minute, and its low and high alarms. Type a limit in place, or press and slide on it; empty is off. Options: which controls, in which order.
 
@@ -43,7 +44,7 @@ On each probe:
 
 - **Sous Chef progress**: the cook's bar in the probe's color, internal → target.
 - **Sous Chef cook**: the food type, the target (typed in with Custom, or the doneness's temperature; tap to choose another level), and the chart: every food, doneness and temperature of a source, with each food's safe minimum. Choose a row to set the probe's Source, Food type and Doneness. Options: which controls, in which order.
-- **Sous Chef channels**: one outline shaped like the probe, its tip at the left, holding each channel's temperature from the tip, separated by dots, with its difference from the reference (the lowest) under it when more than 1 degree. A tap on one shows its history. Options: the differences on or off.
+- **Sous Chef channels**: one outline shaped like the probe, its tip at the left, holding each channel's temperature from the tip, separated by dots, with its difference from the reference (the lowest) under it when more than 1 degree. The outline is filled in the probe's color, faintest at the coldest channel and strongest at the hottest, blending between them. A tap on one shows its history. Options: the differences on or off.
 - **Sous Chef timing**: the rate, and the time left; once done, the rest the chart asks for. Options: which controls, in which order.
 
 Each feature's options are in its editor (the pencil beside it in Features). The features also work in any tile card for a Sous Chef ambient sensor or probe.
@@ -61,6 +62,7 @@ features:
   - type: custom:sous-chef-probes
   - type: custom:sous-chef-history
   - type: custom:sous-chef-ambient
+  - type: custom:sous-chef-probe-tiles
 features_position: inline
 style: stainless
 grill_icon: bull

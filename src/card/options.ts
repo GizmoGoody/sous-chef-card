@@ -1,7 +1,7 @@
 // The card's own options: their checks, the configuration as the editor
 // saves it, and the tile cards' options as the card passes them on (the
 // grill's, and each probe's). Pure, so the unit tests can check them.
-import { FEATURES_STYLES, GRILL_FEATURES, ICONS, PROBE_FEATURES, STYLES } from "../const";
+import { FEATURES, FEATURES_STYLES, GRILL_FEATURES, ICONS, PROBE_FEATURES, STYLES } from "../const";
 import type { Config, HomeAssistant } from "../ha";
 import { ambients, tileColorOf, type Probe } from "../sous-chef";
 
@@ -44,14 +44,31 @@ export function tileConfig(config: Config): Config {
   return tile;
 }
 
+/** The default features of a probe's tile: progress, cook, channels and timing. */
+export const defaultProbeFeatures = (): Config[] => PROBE_FEATURES.map((type) => ({ type: `custom:${type}` }));
+
+/** The features a probe's tile shows: as chosen in the Sous Chef probes feature, or the defaults. */
+export const probeFeaturesOf = (feature?: Config): Config[] =>
+  Array.isArray(feature?.features) ? feature!.features : defaultProbeFeatures();
+
+/** Whether a grill feature is Sous Chef probes (the probes' tiles). */
+export const isProbeTiles = (feature: Config): boolean => feature?.type === `custom:${FEATURES.probeTiles}`;
+
+/** The card's Sous Chef probes feature: without one, the card shows no probe tiles. */
+export const probeTilesOf = (config?: Config): Config | undefined =>
+  (Array.isArray(config?.features) ? config!.features : []).find(isProbeTiles);
+
 // A tap on the grill shows or hides the probes (see the card's ll-custom handler)
 export const TOGGLE_ACTION = { action: "fire-dom-event", sous_chef_card: "toggle" };
 
 /** The grill's tile card: its options, its icon a brand's mark when chosen, and a tap that shows or hides the probes. */
 export function grillConfig(config: Config, open = true): Config {
   const tile = tileConfig(config);
+  // Sous Chef probes is drawn by the card, below the grill: not among the grill's own features
+  const features = (Array.isArray(config.features) ? config.features : []).filter((f: Config) => !isProbeTiles(f));
+  if (Array.isArray(config.features)) tile.features = features;
   // Closed: only the title row (with the feature beside the title), as the Prusa Connect card
-  if (!open) tile.features = tile.features_position === "inline" ? (config.features ?? []).slice(0, 1) : [];
+  if (!open) tile.features = tile.features_position === "inline" ? features.slice(0, 1) : [];
   delete tile.show_entity_picture;
   if (optionOf(config, "grill_icon") !== "grill") tile.show_entity_picture = true;
   if (optionOf(config, "probes_toggle") !== false) tile.tap_action = TOGGLE_ACTION;
@@ -63,14 +80,14 @@ export function grillConfig(config: Config, open = true): Config {
  * probe's color, with the food, its doneness and status as the state, and the probe
  * features below, two to a row.
  */
-export function probeConfig(probe: Probe, name: string): Config {
+export function probeConfig(probe: Probe, name: string, features: Config[] = defaultProbeFeatures()): Config {
   return {
     type: "tile",
     entity: probe.entities.food_type ?? probe.entities.active,
     name,
     color: tileColorOf(probe),
     state_content: ["state", "doneness", "status"],
-    features: PROBE_FEATURES.map((type) => ({ type: `custom:${type}` })),
+    features,
     features_position: "bottom",
     tap_action: { action: "none" },
     icon_tap_action: { action: "more-info" },

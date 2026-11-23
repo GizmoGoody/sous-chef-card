@@ -25,7 +25,7 @@ const probeEntityIds = (probe: Probe): string[] =>
  */
 export class SousChefProbes extends SousChefFeature {
   static override tag = FEATURES.probes;
-  static override pickerName = "Sous Chef probes";
+  static override pickerName = "Sous Chef switches";
   static override forKind = "grill" as const;
   static override options = [{
     name: "show", label: "Keys show", default: "temperatures",
@@ -160,6 +160,10 @@ type Chart = {
 };
 
 const HOURS = 1;
+// The graph's height (px): with one probe on, more for each probe after it, up to the most
+const HISTORY_HEIGHT = 240;
+const HISTORY_PER_PROBE = 24;
+const HISTORY_MAX = 360;
 // The share of the width the projections take, right of the history
 const AHEAD = 0.3;
 
@@ -215,7 +219,7 @@ export class SousChefHistory extends SousChefFeature {
       data: (c) => ({
         ...base.data(c),
         hours_to_show: c.hours_to_show, min_y_axis: c.min_y_axis, max_y_axis: c.max_y_axis,
-        expand_legend: c.expand_legend !== false, fit_y_data: c.fit_y_data === true,
+        expand_legend: c.expand_legend === true, fit_y_data: c.fit_y_data === true,
       }),
     };
   }
@@ -304,7 +308,7 @@ export class SousChefHistory extends SousChefFeature {
     const c = this._config!;
     const config: Config = {
       type: "history-graph", entities, hours_to_show: Number(c.hours_to_show) > 0 ? Number(c.hours_to_show) : HOURS,
-      expand_legend: c.expand_legend !== false, grid_options: { rows: 4 },
+      ...(c.expand_legend === true ? { expand_legend: true } : {}), grid_options: { rows: 4 },
     };
     if (Number.isFinite(c.min_y_axis) || Number.isFinite(c.max_y_axis)) {
       // The axis as set in the editor, as Home Assistant's own graph takes it
@@ -402,7 +406,10 @@ export class SousChefHistory extends SousChefFeature {
     this._ahead = this._projected ? this._projections() : [];
     const s = this._scale;
     const y = (v: number) => (s && s.max > s.min ? s.top + ((s.max - v) / (s.max - s.min)) * (s.bottom - s.top) : -100);
-    return html`<div class="box ${this._projected ? "projected" : ""}" style=${styleMap(palette)}>
+    // Taller as more probes are on, so the lines keep their room
+    const lines = allProbes(hass).filter((p) => isActive(hass, p)).length;
+    const height = `${Math.min(HISTORY_MAX, HISTORY_HEIGHT + Math.max(0, lines - 1) * HISTORY_PER_PROBE)}px`;
+    return html`<div class="box ${this._projected ? "projected" : ""}" style=${styleMap({ ...palette, "--sc-history-height": height })}>
       <div class="graph">${this._graph ?? nothing}</div>
       <div class="ahead" aria-hidden="true">
         <svg>

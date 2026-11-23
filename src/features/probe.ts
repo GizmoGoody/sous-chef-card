@@ -136,7 +136,13 @@ export class SousChefChannels extends SousChefFeature {
 
   static override styles = [featureStyles, css`
     /* The outline: a sharp tip, then the body with a rounded end */
-    .probe { position: relative; display: flex; align-items: stretch; min-width: 0; height: var(--feature-height, 42px); color: var(--sc-text, var(--primary-text-color)); }
+    .probe { position: relative; isolation: isolate; display: flex; align-items: stretch; min-width: 0; height: var(--feature-height, 42px); color: var(--sc-text, var(--primary-text-color)); }
+    /* The fill: the coldest channel faintest, the hottest strongest, in the probe's color */
+    .probe::before {
+      content: ""; position: absolute; inset: 0; z-index: -1; background: var(--heat);
+      border-radius: 0 var(--feature-border-radius, 12px) var(--feature-border-radius, 12px) 0;
+      clip-path: polygon(34px 0, 100% 0, 100% 100%, 34px 100%, 0 50%);
+    }
     .probe .tip { flex: none; width: 34px; height: 100%; overflow: visible; }
     .probe .tip path { fill: none; stroke: var(--c); stroke-width: 1.5px; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
     .probe .body {
@@ -164,7 +170,7 @@ export class SousChefChannels extends SousChefFeature {
     const shown = (d?: number) => d !== undefined && d > 1;
     const anyDelta = deltas && channels.some((ch) => !ch.reference && shown(ch.delta));
     return html`<div class="row" style=${styleMap({ "--c": colorOf(probe) })}>
-      <div class="probe" data-min=${ITEM_MIN.wide} role="group" aria-label="Channels">
+      <div class="probe" data-min=${ITEM_MIN.wide} role="group" aria-label="Channels" style=${styleMap({ "--heat": heatFill(channels) })}>
         <svg class="tip" viewBox="0 0 34 42" preserveAspectRatio="none" aria-hidden="true"><path d="M34.5 0.75 L0.75 21 L34.5 41.25"></path></svg>
         <div class="body ${anyDelta ? "deltas" : ""}">
           ${channels.map((ch, i) => {
@@ -181,6 +187,16 @@ export class SousChefChannels extends SousChefFeature {
     </div>`;
   }
 }
+
+/** The channels' heat across the outline: the tip's color from the point, then each channel's at its place, blended between. */
+function heatFill(channels: { heat: number }[]): string {
+  const tint = (heat: number) => `color-mix(in srgb, var(--c) ${Math.round((0.14 + 0.5 * heat) * 100)}%, transparent)`;
+  const stops = channels.map((ch, i) => `${tint(ch.heat)} calc(${TIP}px + (100% - ${TIP}px) * ${((i + 0.5) / channels.length).toFixed(3)})`);
+  return `linear-gradient(90deg, ${tint(channels[0]?.heat ?? 0)} 0, ${stops.join(", ")})`;
+}
+
+// The tip's length (px), as drawn
+const TIP = 34;
 
 /** The rate, and the time left; once done, the rest the chart asks for. */
 export class SousChefTiming extends SousChefFeature {
