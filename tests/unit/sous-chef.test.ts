@@ -3,7 +3,7 @@ import { featureForm } from "../../src/features/form";
 import { checkConfig, grillConfig, minimal, probeConfig, stubConfig, tileConfig } from "../../src/card/options";
 import type { HomeAssistant } from "../../src/ha";
 import {
-  allProbes, ambients, axisRange, channelReadings, durationText, grillBadge, grillLine, internalSensor, probeDevices, probeLine, probeOf,
+  allProbes, ambients, axisRange, channelReadings, heatScale, durationText, grillBadge, grillLine, internalSensor, probeDevices, probeLine, probeOf,
   rateText, shortNames, statusOf, statusText, trendOf,
 } from "../../src/sous-chef";
 
@@ -178,14 +178,14 @@ describe("the card's options", () => {
     expect(() => checkConfig({ ...card, probe_list: [] })).toThrow(/Unknown option/);
   });
   it("leaves out options at their defaults", () =>
-    expect(minimal({ ...card, style: "none", grill_icon: "bull", features_style: "match", probes_toggle: true })).toEqual({ ...card, grill_icon: "bull" }));
+    expect(minimal({ ...card, style: "none", grill_icon: "bull", features_style: "match", fold: true })).toEqual({ ...card, grill_icon: "bull" }));
   it("hands the tile card only its own options", () => {
     const tile = tileConfig({ ...card, style: "black", features_style: "console" });
     expect(tile).toEqual({ type: "tile", entity: "sensor.grill_ambient" });
   });
   it("the grill: a tap shows or hides the probes, and a brand's mark is its picture", () => {
     expect(grillConfig(card).tap_action).toEqual({ action: "fire-dom-event", sous_chef_card: "toggle" });
-    expect(grillConfig({ ...card, probes_toggle: false }).tap_action).toBeUndefined();
+    expect(grillConfig({ ...card, fold: false }).tap_action).toBeUndefined();
     expect(grillConfig({ ...card, grill_icon: "weber" }).show_entity_picture).toBe(true);
     expect(grillConfig(card).show_entity_picture).toBeUndefined();
   });
@@ -202,7 +202,8 @@ describe("the card's options", () => {
     const stub = stubConfig(kit());
     expect(stub.entity).toBe("sensor.grill_ambient");
     expect(stub.features_position).toBe("inline");
-    expect(stub.features[0].type).toBe("custom:sous-chef-probes");
+    expect(stub.features[0].type).toBe("custom:sous-chef-switches");
+    expect(stub.features.at(-1).type).toBe("custom:sous-chef-probes");
   });
 });
 
@@ -227,9 +228,23 @@ describe("the feature editors", () => {
 describe("the collapsed grill", () => {
   it("keeps only the feature beside the title", () => {
     const config = { type: "custom:sous-chef-card", entity: "sensor.grill_ambient", features_position: "inline",
-      features: [{ type: "custom:sous-chef-probes" }, { type: "custom:sous-chef-history" }] };
-    expect(grillConfig(config, false).features).toEqual([{ type: "custom:sous-chef-probes" }]);
+      features: [{ type: "custom:sous-chef-switches" }, { type: "custom:sous-chef-history" }] };
+    expect(grillConfig(config, false).features).toEqual([{ type: "custom:sous-chef-switches" }]);
     expect(grillConfig({ ...config, features_position: "bottom" }, false).features).toEqual([]);
     expect(grillConfig(config).features).toHaveLength(2);
+  });
+});
+
+describe("the grill's heat scale", () => {
+  it("puts the alarms' range in the middle, with a quarter of it past each alarm", () => {
+    const s = heatScale(250, 225, 275)!;
+    expect([s.min, s.max]).toEqual([212.5, 287.5]);
+    expect(s.at(250)).toBe(0.5);
+    expect(s.at(400)).toBe(1);
+  });
+  it("without an alarm, keeps the reading on the scale", () => {
+    const s = heatScale(60, 0, 0)!;
+    expect([s.min, s.max]).toEqual([10, 110]);
+    expect(heatScale(undefined, 0, 0)).toBeUndefined();
   });
 });

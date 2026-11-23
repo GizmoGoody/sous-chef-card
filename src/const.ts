@@ -10,13 +10,16 @@ export const CARD_TYPE = "sous-chef-card";
 export const EDITOR_TYPE = "sous-chef-card-editor";
 export const TILE_TYPE = "sous-chef-tile";
 export const TILE_EDITOR_TYPE = "sous-chef-tile-card-editor";
+export const PROBES_EDITOR_TYPE = "sous-chef-probes-editor";
 export const FEATURE_EDITOR_TYPE = "sous-chef-feature-editor";
 // The Sous Chef integration's page, where probes and ambient sensors are added
 export const MANAGE_PATH = `/config/integrations/integration/${DOMAIN}`;
 
 // The features, each a tile card feature (custom:<type>)
 export const FEATURES = {
+  switches: "sous-chef-switches",
   probes: "sous-chef-probes",
+  heat: "sous-chef-heat",
   history: "sous-chef-history",
   ambient: "sous-chef-ambient",
   progress: "sous-chef-progress",
@@ -27,8 +30,8 @@ export const FEATURES = {
 } as const;
 export const FEATURE_TAGS: string[] = Object.values(FEATURES);
 
-// A new card's grill features (Probes beside the title), and every probe's
-export const GRILL_FEATURES = [FEATURES.probes, FEATURES.history, FEATURES.ambient];
+// A new card's grill features (the probes' switches beside the title, the probes' tiles last), and a probe's by default
+export const GRILL_FEATURES = [FEATURES.switches, FEATURES.history, FEATURES.ambient, FEATURES.probes];
 export const PROBE_FEATURES = [FEATURES.progress, FEATURES.cook, FEATURES.channels, FEATURES.timing];
 
 // Styles: each a grill's finish (see grill/finishes.ts)

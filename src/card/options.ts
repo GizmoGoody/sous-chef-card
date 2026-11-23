@@ -6,12 +6,12 @@ import type { Config, HomeAssistant } from "../ha";
 import { ambients, colorNameOf, type Probe } from "../sous-chef";
 
 // Options this card adds to the tile card's
-export const OWN_KEYS = ["style", "grill_icon", "features_style", "probes_toggle"];
-export const DEFAULTS: Config = { style: "none", grill_icon: "grill", features_style: "match", probes_toggle: true };
+export const OWN_KEYS = ["style", "grill_icon", "features_style", "fold"];
+export const DEFAULTS: Config = { style: "none", grill_icon: "grill", features_style: "match", fold: true };
 
 // Option names in this card's own namespace: one that is not a current
 // option is a mistake (a typo, or an option that was renamed), so the card says so
-const OWN_PREFIXES = ["style", "grill", "features_style", "probe"];
+const OWN_PREFIXES = ["style", "grill", "features_style", "probe", "fold"];
 
 const LISTS: Record<string, [string, string][]> = { style: STYLES, grill_icon: ICONS, features_style: FEATURES_STYLES };
 
@@ -24,7 +24,7 @@ export function checkConfig(config: Config): void {
   for (const [key, list] of Object.entries(LISTS)) {
     if (config[key] !== undefined && !list.some(([id]) => id === config[key])) throw new Error(`Unknown ${key}: ${config[key]}`);
   }
-  if (config.probes_toggle !== undefined && typeof config.probes_toggle !== "boolean") throw new Error("probes_toggle must be true or false");
+  if (config.fold !== undefined && typeof config.fold !== "boolean") throw new Error("fold must be true or false");
 }
 
 /** The configuration as the editor saves it: options at their defaults are left out. */
@@ -54,7 +54,7 @@ export function grillConfig(config: Config, open = true): Config {
   if (!open) tile.features = tile.features_position === "inline" ? (config.features ?? []).slice(0, 1) : [];
   delete tile.show_entity_picture;
   if (optionOf(config, "grill_icon") !== "grill") tile.show_entity_picture = true;
-  if (optionOf(config, "probes_toggle") !== false) tile.tap_action = TOGGLE_ACTION;
+  if (optionOf(config, "fold") !== false) tile.tap_action = TOGGLE_ACTION;
   return tile;
 }
 
@@ -63,14 +63,14 @@ export function grillConfig(config: Config, open = true): Config {
  * probe's color, with its doneness and status as the state, and the probe
  * features below, two to a row.
  */
-export function probeConfig(probe: Probe, name: string): Config {
+export function probeConfig(probe: Probe, name: string, features: Config[] = PROBE_FEATURES.map((type) => ({ type: `custom:${type}` }))): Config {
   return {
     type: "tile",
     entity: probe.entities.food_type ?? probe.entities.active,
     name,
     color: colorNameOf(probe),
     state_content: ["doneness", "status"],
-    features: PROBE_FEATURES.map((type) => ({ type: `custom:${type}` })),
+    features,
     features_position: "bottom",
     tap_action: { action: "more-info" },
     icon_tap_action: { action: "more-info" },

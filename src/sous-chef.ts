@@ -379,3 +379,24 @@ export function cookBar(hass: HomeAssistant, probe: Probe): CookBar {
     label: !reading ? "" : target !== undefined ? `${whole(internal!)} → ${whole(target)} ${unit}` : `${whole(internal!)} ${unit}`,
   };
 }
+
+/**
+ * The grill's heat scale (Sous Chef heat): from below its low alarm to above
+ * its high alarm, so the range between them sits in the middle. Without an
+ * alarm, 50 degrees past the reading on that side. Positions are 0 to 1,
+ * clamped to the ends; an alarm of 0 is off.
+ */
+export function heatScale(value: number | undefined, low: number | undefined, high: number | undefined):
+  { min: number; max: number; at(v: number): number } | undefined {
+  const lo = low && low > 0 ? low : undefined, hi = high && high > 0 && (lo === undefined || high > lo) ? high : undefined;
+  const center = value ?? lo ?? hi;
+  if (center === undefined) return undefined;
+  const margin = lo !== undefined && hi !== undefined ? Math.max((hi - lo) * 0.25, 10) : 50;
+  let min = (lo ?? Math.min(center, hi ?? center)) - margin, max = (hi ?? Math.max(center, lo ?? center)) + margin;
+  // Without both alarms, the reading always shows on the scale
+  if ((lo === undefined || hi === undefined) && value !== undefined) {
+    min = Math.min(min, value - 10);
+    max = Math.max(max, value + 10);
+  }
+  return { min, max, at: (v: number) => Math.min(1, Math.max(0, (v - min) / (max - min))) };
+}
