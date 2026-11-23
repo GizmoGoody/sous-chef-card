@@ -407,7 +407,7 @@ export class SousChefHistory extends SousChefFeature {
     const s = this._scale;
     const y = (v: number) => (s && s.max > s.min ? s.top + ((s.max - v) / (s.max - s.min)) * (s.bottom - s.top) : -100);
     // Taller as more probes are on, so the lines keep their room
-    const lines = allProbes(hass).filter((p) => isActive(hass, p)).length;
+    const lines = allProbes(this._hass!).filter((p) => isActive(this._hass!, p)).length;
     const height = `${Math.min(HISTORY_MAX, HISTORY_HEIGHT + Math.max(0, lines - 1) * HISTORY_PER_PROBE)}px`;
     return html`<div class="box ${this._projected ? "projected" : ""}" style=${styleMap({ ...palette, "--sc-history-height": height })}>
       <div class="graph">${this._graph ?? nothing}</div>
