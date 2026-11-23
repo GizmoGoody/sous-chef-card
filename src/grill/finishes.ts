@@ -1,6 +1,6 @@
 // The styles: each a grill's finish, drawn behind the whole card in CSS.
 // Stainless steel is brushed satin (Napoleon, Lynx, Blaze, Recteq); Bull is
-// its polished stainless, with rivets at the corners; black porcelain is
+// its warmer brushed stainless under a polished chrome band, as its hood; black porcelain is
 // enamel (Weber kettles, Traeger Ironwood and Timberline); Traeger bronze is
 // the Pro's powder coat; Big Green Egg and Kamado Joe are their glazed
 // ceramics, Big Green Egg's pebbled.
@@ -39,11 +39,8 @@ const POLISHED = svg(noise("l", "0.002 0.8", 2, 4, "1", 0.6, -0.26) + noise("d",
 const PEBBLED = svg(noise("l", "0.55", 2, 2, "1", 1.6, -1.0) + noise("d", "0.45", 2, 7, "0", 1.8, -0.95), 240, 240);
 const GLAZE = svg(noise("l", "0.6", 1, 5, "1", 1.6, -1.1), 240, 240);
 
-/** A rivet: a domed head, lit from the top left, at a point of the card. */
-const rivet = (at: string): string =>
-  `radial-gradient(circle 5px at ${at}, #ffffff 0, #e4e7ea 28%, #959ca4 66%, rgba(30,34,38,.6) 90%, transparent 100%)`;
-// Clear of the card's rounded corners
-const RIVETS = ["18px 18px", "calc(100% - 18px) 18px", "18px calc(100% - 18px)", "calc(100% - 18px) calc(100% - 18px)"].map(rivet).join(", ");
+// Polished chrome, as Bull's handle and trim: a narrow band of sharp, bright reflections
+const CHROME = "linear-gradient(180deg, #7d848b 0px, #ffffff 3px, #b9bfc5 6px, #f4f6f8 8px, #ffffff 10px, #8a9198 13px, #dfe3e6 15px, rgba(0,0,0,.28) 16px, transparent 18px)";
 
 const LIGHT_SCREEN = { background: "rgba(240,242,245,.88)", solid: "#f0f2f5", text: "rgba(0,0,0,.85)", secondary: "rgba(40,40,48,.7)", grid: "rgba(0,0,0,.14)" };
 
@@ -56,10 +53,10 @@ export const FINISHES: Record<string, Finish> = {
     screen: LIGHT_SCREEN,
   },
   bull: {
-    // Polished: bright, sharp bands of reflection, the grain fainter, and a rivet at each corner
-    surface: `${RIVETS}, ${POLISHED} 0 0 / 600px 300px, `
-      + "linear-gradient(172deg, #f7f9fa 0%, #c9ced3 14%, #8e959c 27%, #e9ecef 41%, #fbfcfd 47%, #b2b8be 60%, #e4e7ea 78%, #959ca3 100%)",
-    tone: "light", base: "#cdd2d6", border: "rgba(0,0,0,.3)",
+    // Bull's satin brushed stainless, warmer and more even than Stainless steel, under a polished chrome band
+    surface: `${CHROME} 0 0 / 100% 18px no-repeat, ${POLISHED} 0 0 / 600px 300px, `
+      + "linear-gradient(176deg, #dcdbd7 0%, #cfceca 25%, #d8d7d3 45%, #c3c2be 70%, #cdccc8 100%)",
+    tone: "light", base: "#c4c3bf", border: "rgba(0,0,0,.3)",
     screen: LIGHT_SCREEN,
   },
   black: {

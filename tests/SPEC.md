@@ -62,7 +62,7 @@ Each feature is offered only on a tile card for its kind of entity (a grill, or 
 
 | ID | Behavior | Check |
 | --- | --- | --- |
-| S-1 | Style: Stainless steel (brushed), Bull (polished stainless, a rivet at each corner), Black porcelain, Traeger bronze, Big Green Egg (pebbled glaze), Kamado Joe (smooth glaze), or None (the theme); the finish covers the whole card, with its own text colors | real HA |
+| S-1 | Style: Stainless steel (brushed), Bull (warm satin stainless under a polished chrome band, as its hood), Black porcelain, Traeger bronze, Big Green Egg (pebbled glaze), Kamado Joe (smooth glaze), or None (the theme); the finish covers the whole card, with its own text colors | real HA |
 | S-2 | Features style (with a style): Match (the controls on the finish), Flat (each on a plain patch of it), Console (keys that press in) | real HA |
 
 ## Editor

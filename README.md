@@ -16,7 +16,7 @@ Add the **Sous Chef** card to a dashboard. In its editor:
 
 - The tile card's own editor, for the grill: pick a grill (a Sous Chef ambient sensor), then Content, Interactions and Features.
 - **Sous Chef**:
-  - **Style**: a grill's finish behind the whole card. Stainless steel (brushed: Napoleon, Lynx, Blaze, Recteq), Bull (polished stainless with rivets), Black porcelain (Weber kettles, Traeger Ironwood and Timberline), Traeger bronze (Traeger Pro), Big Green Egg, Kamado Joe, or None (your theme).
+  - **Style**: a grill's finish behind the whole card. Stainless steel (brushed: Napoleon, Lynx, Blaze, Recteq), Bull (its warm satin stainless under a polished chrome band), Black porcelain (Weber kettles, Traeger Ironwood and Timberline), Traeger bronze (Traeger Pro), Big Green Egg, Kamado Joe, or None (your theme).
   - **Icon**: Grill, or Bull, Weber, Traeger, Big Green Egg or Kamado Joe: the brand's small mark, without its name. Big Green Egg has no mark without its name, so it is a green egg.
   - **Features style** (with a style): Match (the controls sit on the finish), Flat (on a plain patch of it) or Console (keys that press in).
   - **Tap the card to show or hide the probes**: on by default. Folded, the card keeps only its title row (with the feature beside the title). This browser remembers which.
