@@ -91,11 +91,11 @@ export class SousChefCook extends SousChefFeature {
     const controls: Record<string, () => unknown> = {
       target: () => doneness
         ? numberField(hass, e.target, {
-          placeholder: "Target", title: `Doneness: ${level}`, slide: custom,
+          placeholder: "", title: `Doneness: ${level}`, slide: custom,
           menu: { options: optionsOf(hass, doneness), selected: doneness.state, custom: CUSTOM,
             choose: (option) => this.call("select", "select_option", { entity_id: e.doneness, option }) },
         })
-        : numberField(hass, e.target, { placeholder: "Target", title: "Target" }),
+        : numberField(hass, e.target, { placeholder: "", title: "Target" }),
       chart: () => html`<button type="button" class="key" data-min=${ITEM_MIN.key} title="Chart view: pick from a chart" aria-label="Chart view"
         ?disabled=${!e.source || !e.food_type || !e.doneness}
         @click=${() => showChartDialog(this, { name: probe.name, source: e.source, food_type: e.food_type, doneness: e.doneness, target: e.target })}>

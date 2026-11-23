@@ -9,7 +9,7 @@ import { css, html, nothing, type TemplateResult } from "lit";
 import { styleMap } from "lit/directives/style-map.js";
 import { FEATURES } from "../const";
 import { moreInfo } from "../ha";
-import { heatScale, rateText, valueOf, whole } from "../sous-chef";
+import { CUSTOM, heatScale, rateText, styleLabel, valueOf, whole } from "../sous-chef";
 import { SousChefFeature } from "./base";
 import { featureStyles } from "./styles";
 import { GrillTrend } from "./trend";
@@ -29,6 +29,20 @@ export class SousChefHeat extends SousChefFeature {
   static override tag = FEATURES.heat;
   static override pickerName = "Sous Chef heat";
   static override forKind = "grill" as const;
+  static override controls: [string, string][] = [["alarms", "Alarms"], ["target", "Target"], ["trend", "Trend arrow"]];
+  static override options = [
+    {
+      name: "scale", label: "Scale", default: "alarms",
+      helper: "Around the alarms (and the target), or a fixed range from Scale low to Scale high",
+      selector: { select: { mode: "dropdown", options: [{ value: "alarms", label: "Around the alarms" }, { value: "fixed", label: "Fixed range" }] } },
+    },
+    { name: "scale_min", label: "Scale low", helper: "With Fixed range", default: undefined, selector: { number: { mode: "box", step: "any" } } },
+    { name: "scale_max", label: "Scale high", helper: "With Fixed range", default: undefined, selector: { number: { mode: "box", step: "any" } } },
+    {
+      name: "tap", label: "Tap", default: "history",
+      selector: { select: { mode: "dropdown", options: [{ value: "history", label: "The grill's history" }, { value: "styles", label: "The cook style list" }] } },
+    },
+  ];
 
   static override styles = [featureStyles, css`
     .heat { position: relative; display: block; width: 100%; height: var(--feature-height, 42px); padding: 0; border: 0; margin: 0;
@@ -46,6 +60,9 @@ export class SousChefHeat extends SousChefFeature {
     .goal { position: absolute; bottom: 4px; width: 4px; height: 20px; margin-left: -2px; border-radius: 2px; background: #fff;
       box-shadow: 0 0 0 1px rgba(0, 0, 0, .55); }
     .limit.goal-label { font-weight: 600; color: var(--sc-text, var(--primary-text-color)); }
+    /* Tap: the cook style list, the browser's own, over the whole bar */
+    .wrap { position: relative; }
+    .wrap select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font: inherit; }
     :host([sc-console]) .bar { box-shadow: inset 0 2px 4px rgba(0, 0, 0, .45); }
   `];
 
@@ -69,36 +86,51 @@ export class SousChefHeat extends SousChefFeature {
     const low = ambient ? valueOf(hass, ambient.low) : undefined, high = ambient ? valueOf(hass, ambient.high) : undefined;
     const target = ambient ? valueOf(hass, ambient.target) : undefined;
     const goal = target && target > 0 ? target : undefined;
-    const scale = heatScale(value, low, high, goal);
+    const show = new Set(this.chosen());
+    // A fixed range when chosen and set; otherwise around the alarms and the target
+    const fixedLow = Number(this._config?.scale_min), fixedHigh = Number(this._config?.scale_max);
+    const fixed = this.option<string>("scale") === "fixed" && Number.isFinite(fixedLow) && Number.isFinite(fixedHigh) && fixedHigh > fixedLow;
+    const scale = fixed
+      ? { min: fixedLow, max: fixedHigh, at: (v: number) => Math.min(1, Math.max(0, (v - fixedLow) / (fixedHigh - fixedLow))) }
+      : heatScale(value, low, high, show.has("target") ? goal : undefined);
     this.showNothing(!ambient || !scale);
     if (!ambient || !scale) return nothing;
     const rate = this._trend.rate(hass, ambient.sensor);
-    const arrow = trendArrow(rate);
-    const lo = low && low > 0 ? low : undefined, hi = high && high > 0 ? high : undefined;
-    const past = value !== undefined && ((lo !== undefined && value < lo) || (hi !== undefined && value > hi));
+    const arrow = show.has("trend") ? trendArrow(rate) : undefined;
+    const lo = show.has("alarms") && low && low > 0 ? low : undefined, hi = show.has("alarms") && high && high > 0 ? high : undefined;
+    const past = value !== undefined && ((!!low && low > 0 && value < low) || (!!high && high > 0 && value > high));
     // Labels and the marker keep clear of the ends
     const pct = (v: number) => `${scale.at(v) * 100}%`;
     const title = `Grill: ${value === undefined ? "no reading" : `${whole(value)}°`}`
       + `${goal !== undefined ? `, target ${whole(goal)}°` : ""}${lo !== undefined ? `, low alarm ${whole(lo)}°` : ""}${hi !== undefined ? `, high alarm ${whole(hi)}°` : ""}`
       + `${rate !== undefined ? `, ${rateText(rate)}` : ""}`;
-    return html`<button type="button" class="heat" title=${title} aria-label=${title} @click=${() => moreInfo(this, ambient.sensor)}>
+    // Tap: the grill's history, or the cook style list (over the bar)
+    const style = this.option<string>("tap") === "styles" && ambient.style ? hass.states[ambient.style] : undefined;
+    const presets: Record<string, { target?: number }> = style?.attributes.presets ?? {};
+    const options: string[] = Array.isArray(style?.attributes.options) ? style!.attributes.options : [];
+    const list = style ? html`<select aria-label="Cook style" .value=${style.state === CUSTOM ? "" : style.state}
+      @change=${(ev: Event) => this.call("select", "select_option", { entity_id: ambient.style, option: (ev.target as HTMLSelectElement).value })}>
+      ${style.state === CUSTOM ? html`<option value="" hidden></option>` : nothing}
+      ${options.filter((o) => o !== CUSTOM).map((o) => html`<option value=${o} ?selected=${o === style.state}>${styleLabel(hass.formatEntityState(style, o), presets[o])}</option>`)}
+    </select>` : nothing;
+    return html`<div class="wrap"><button type="button" class="heat" title=${title} aria-label=${title} @click=${() => moreInfo(this, ambient.sensor)}>
       <span class="bar">
         ${lo !== undefined ? html`<span class="out" style=${styleMap({ left: "0", width: pct(lo) })}></span>` : nothing}
         ${hi !== undefined ? html`<span class="out" style=${styleMap({ left: pct(hi), right: "0" })}></span>` : nothing}
       </span>
       ${[lo, hi].map((v) => (v === undefined ? nothing : html`<span class="tick" style=${styleMap({ left: pct(v) })}></span>
         <span class="limit num" style=${styleMap({ left: `clamp(14px, ${pct(v)}, calc(100% - 14px))` })}>${whole(v)}°</span>`))}
-      ${goal === undefined ? nothing : html`<span class="goal" style=${styleMap({ left: pct(goal) })}></span>
+      ${goal === undefined || !show.has("target") ? nothing : html`<span class="goal" style=${styleMap({ left: pct(goal) })}></span>
         <span class="limit goal-label num" style=${styleMap({ left: `clamp(14px, ${pct(goal)}, calc(100% - 14px))` })}>${whole(goal)}°</span>`}
       ${value === undefined ? nothing : html`<span class="marker ${past ? "alarm" : ""}" style=${styleMap({ left: `clamp(32px, ${pct(value)}, calc(100% - 32px))` })}>
         ${arrow && rate! < 0 ? html`<ha-icon .icon=${arrow}></ha-icon>` : nothing}${whole(value)}°${arrow && rate! > 0 ? html`<ha-icon .icon=${arrow}></ha-icon>` : nothing}
       </span>`}
-    </button>`;
+    </button>${list}</div>`;
   }
 
   // The alarms and the reading
   protected override watched(): string[] {
     const a = this.ambient;
-    return a ? [a.sensor, a.alarm, a.low, a.high, a.target].filter((id): id is string => !!id) : [];
+    return a ? [a.sensor, a.alarm, a.low, a.high, a.target, a.style].filter((id): id is string => !!id) : [];
   }
 }

@@ -120,7 +120,7 @@ export class SousChefAmbient extends SousChefFeature {
       trend: () => readout(title, () => moreInfo(this, ambient.sensor),
         html`<ha-icon .icon=${rateIcon(rate, 0.5)}></ha-icon>${rate === undefined ? html`<span class="note">Trend</span>` : html`<span>${rateText(rate)}</span>`}`),
       target: () => numberField(hass, ambient.target, {
-        icon: "mdi:target", placeholder: "Target", empty: 0,
+        icon: "mdi:target", placeholder: "", empty: 0,
         title: style ? `Cook style: ${hass.formatEntityState(style)}` : "Grill target",
         menu: styles, slide: !styles || styles.selected === CUSTOM,
       }),
