@@ -34,8 +34,9 @@ A probe appears once it is on: taken off its charger, its key tapped, or its Act
 
 On the grill:
 
-- **Sous Chef probes**: a key for each probe beside the grill's name, pressed while it is on, with its temperature. Tap one to turn the probe on or off. Options: show the temperature or the probe icon.
-- **Sous Chef history**: Home Assistant's history graph of the last hour: the grill in orange, each probe that is on in its color, and its target the same color dimmed. The key at the top right shows projected temperatures for the hour ahead. The axis is in whole degrees, and on a style the graph takes the finish's colors. Options: hours to show, and the projections key.
+- **Sous Chef probes**: a key for each probe beside the grill's name, sharing its width, pressed while it is on, with its temperature. Tap one to turn the probe on or off. Options: show the temperature or the probe icon.
+- **Sous Chef history**: Home Assistant's history graph of the last hour: the grill in orange, each probe that is on in its color, and its target in the same color. The key at the top right shows projected temperatures for the hour ahead. The axis is in whole degrees, and on a style the graph takes the finish's colors. Options: hours to show, and the projections key.
+- **Sous Chef progress bars**: a thin bar for each probe that is on, filled to its progress in its color, with its temperature and target beside it. Options: the readings on or off.
 - **Sous Chef ambient**: the grill's trend in degrees a minute, and its low and high alarms. Type a limit in place; empty is off. Options: which controls, in which order.
 
 On each probe:

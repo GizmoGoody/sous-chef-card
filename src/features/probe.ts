@@ -9,7 +9,7 @@ import { showChartDialog } from "../chart/dialog";
 import { FEATURES } from "../const";
 import { known, moreInfo, type HassEntity } from "../ha";
 import {
-  channelReadings, colorOf, CUSTOM, doneAtOf, durationText, internalSensor, internalValue, progressOf, rateIcon, rateText,
+  channelReadings, colorOf, cookBar, CUSTOM, doneAtOf, durationText, internalSensor, rateIcon, rateText,
   statusOf, valueOf, whole,
 } from "../sous-chef";
 import { SousChefFeature } from "./base";
@@ -44,19 +44,11 @@ export class SousChefProgress extends SousChefFeature {
     this.showNothing(!probe);
     if (!probe) return nothing;
     const e = probe.entities;
-    const status = statusOf(hass, probe);
-    const internal = internalValue(hass, probe), target = valueOf(hass, e.target);
-    const reading = internal !== undefined && status !== "no_reading";
-    const over = reading && target !== undefined && internal! > target;
-    const start = probe.start ?? Math.min(internal ?? 0, target ?? 0);
-    const fill = over ? 100 : progressOf(hass, probe);
-    const goal = over && internal! > start ? ((target! - start) / (internal! - start)) * 100 : undefined;
-    const unit = hass.states[e.target ?? ""]?.attributes.unit_of_measurement ?? "°";
-    const label = !reading ? "" : target !== undefined ? `${whole(internal!)} → ${whole(target)} ${unit}` : `${whole(internal!)} ${unit}`;
+    const { fill, goal, stalled, label } = cookBar(hass, probe);
     return html`<button type="button" class="bar" style=${styleMap({ "--c": colorOf(probe) })} role="progressbar"
       aria-valuemin="0" aria-valuemax="100" aria-valuenow=${Math.round(fill)} title="${probe.name}: ${label || "no reading"}"
       aria-label="${probe.name} progress" @click=${() => moreInfo(this, e.progress)}>
-      <div class="fill ${status === "stalled" ? "stalled" : ""}" style=${styleMap({ width: `${fill}%` })}></div>
+      <div class="fill ${stalled ? "stalled" : ""}" style=${styleMap({ width: `${fill}%` })}></div>
       ${goal !== undefined ? html`<div class="goal" style=${styleMap({ left: `${goal}%` })}></div>` : nothing}
       <span class="label num">${label}</span>
     </button>`;

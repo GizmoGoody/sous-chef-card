@@ -23,6 +23,7 @@ export const FEATURES = {
   cook: "sous-chef-cook",
   channels: "sous-chef-channels",
   timing: "sous-chef-timing",
+  bars: "sous-chef-progress-bars",
 } as const;
 export const FEATURE_TAGS: string[] = Object.values(FEATURES);
 

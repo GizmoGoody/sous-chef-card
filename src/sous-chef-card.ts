@@ -6,6 +6,7 @@
 // - custom:sous-chef-probes    a key for each probe beside the grill's name
 // - custom:sous-chef-history   Home Assistant's history graph, with projections
 // - custom:sous-chef-ambient   the grill's trend, and its low and high alarms
+// - custom:sous-chef-progress-bars  a thin bar for each probe that is on
 // - custom:sous-chef-progress  a probe's bar, internal → target
 // - custom:sous-chef-cook      the food type, the target or doneness, and the chart view
 // - custom:sous-chef-channels  each channel from the tip, against the reference
@@ -19,11 +20,11 @@ import { CHART_DIALOG, SousChefChartDialog } from "./chart/dialog";
 import { SousChefCardEditor } from "./editor/card-editor";
 import { SousChefFeatureEditor } from "./editor/feature-editor";
 import type { SousChefFeature } from "./features/base";
-import { SousChefAmbient, SousChefHistory, SousChefProbes } from "./features/grill";
+import { SousChefAmbient, SousChefHistory, SousChefProbes, SousChefProgressBars } from "./features/grill";
 import { SousChefChannels, SousChefCook, SousChefProgress, SousChefTiming } from "./features/probe";
 
 // In the order Home Assistant's feature picker lists them
-const FEATURES: (typeof SousChefFeature)[] = [SousChefProbes, SousChefHistory, SousChefAmbient, SousChefProgress, SousChefCook, SousChefChannels, SousChefTiming];
+const FEATURES: (typeof SousChefFeature)[] = [SousChefProbes, SousChefHistory, SousChefAmbient, SousChefProgressBars, SousChefProgress, SousChefCook, SousChefChannels, SousChefTiming];
 
 if (!customElements.get(CARD_TYPE)) {
   for (const feature of FEATURES) {

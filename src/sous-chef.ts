@@ -355,3 +355,27 @@ export function axisRange(values: number[]): [number, number] | undefined {
   const lo = Math.floor(min / step) * step;
   return [lo, Math.max(Math.ceil(max / step) * step, lo + 20)];
 }
+
+/** A cook's bar: its fill (0 to 100), the goal's place once past the target, whether it stalled, and its reading (68 → 130 °F). */
+export interface CookBar {
+  fill: number;
+  goal?: number;
+  stalled: boolean;
+  label: string;
+}
+
+export function cookBar(hass: HomeAssistant, probe: Probe): CookBar {
+  const e = probe.entities;
+  const status = statusOf(hass, probe);
+  const internal = internalValue(hass, probe), target = valueOf(hass, e.target);
+  const reading = internal !== undefined && status !== "no_reading";
+  const over = reading && target !== undefined && internal! > target;
+  const start = probe.start ?? Math.min(internal ?? 0, target ?? 0);
+  const unit = hass.states[e.target ?? ""]?.attributes.unit_of_measurement ?? "°";
+  return {
+    fill: over ? 100 : progressOf(hass, probe),
+    goal: over && internal! > start ? ((target! - start) / (internal! - start)) * 100 : undefined,
+    stalled: status === "stalled",
+    label: !reading ? "" : target !== undefined ? `${whole(internal!)} → ${whole(target)} ${unit}` : `${whole(internal!)} ${unit}`,
+  };
+}
