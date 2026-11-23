@@ -16,8 +16,6 @@ const SCRUB_TICK = 50;
 const SCRUB_SCALE = 60;
 const SCRUB_POWER = 1.5;
 
-// A field is in the number color, as Home Assistant's number features are
-const NUMBER_ON = "var(--state-number-active-color, var(--state-active-color, var(--primary-color, #03a9f4)))";
 
 /**
  * Press, then slide: while the pointer is held the value changes, faster
@@ -135,7 +133,6 @@ export class SousChefField extends LitElement {
   protected override updated(): void {
     if (!this.hass) return;
     this._shown = this._format(this._value());
-    this.style.setProperty("--feature-color", NUMBER_ON);
     this.classList.add("field", "drag");
     this.classList.toggle("disabled", !this._usable);
     this.classList.toggle("alarm", this.alarm);

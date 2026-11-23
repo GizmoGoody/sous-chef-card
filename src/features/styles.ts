@@ -35,8 +35,8 @@ export const featureStyles = [rowStyles, css`
     background: var(--sc-backing, var(--sc-scrim, transparent));
     color: var(--sc-text, var(--primary-text-color)); font-weight: var(--ha-font-weight-medium, 500);
   }
-  .field::before { content: ""; position: absolute; inset: 0; background: var(--feature-color, ${enabled}); opacity: .2; }
-  .field:focus-within { outline: 2px solid var(--feature-color, ${enabled}); outline-offset: 2px; }
+  .field::before { content: ""; position: absolute; inset: 0; background: var(--c, ${enabled}); opacity: .2; }
+  .field:focus-within { outline: 2px solid var(--c, ${enabled}); outline-offset: 2px; }
   .field > * { position: relative; }
   .field input {
     flex: 1 1 0; width: 0; min-width: 0; margin: 0; padding: 0; border: 0; outline: none; background: transparent;
