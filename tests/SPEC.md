@@ -14,8 +14,8 @@ Sources: the approved mockup (https://claude.ai/artifact/B99qWiXfVKJG1A7KXJKKzD:
 | ID | Behavior | Check |
 | --- | --- | --- |
 | C-1 | One card for the grill and every probe: the grill (a Sous Chef ambient sensor) is Home Assistant's tile card on top; below it, one tile card for each probe that is on. A probe that is off takes no place | real HA |
-| C-2 | A tap on the grill folds the card to its title row (with the feature beside the title), as in the Prusa Connect card, and opens it again; this browser remembers which, per grill. With Tap the title to fold the card off, the card stays open and the grill's tap is the tile card's own | unit (grillConfig), real HA |
-| C-3 | The editor's preview starts open and changes only when tapped | real HA |
+| C-2 | A tap on the grill shows or hides its features below the title and the probes, leaving the title row (with the feature beside the title), as in the Prusa Connect card; this browser remembers which, per grill. With Tap the card to show or hide the probes off, the probes always show and the grill's tap is the tile card's own | unit (grillConfig), real HA |
+| C-3 | The editor's preview starts with the probes shown and changes only when tapped | real HA |
 | C-4 | Every tile card option works on the grill: name, color, state content, actions, features, features position | real HA |
 | C-5 | Wrong options are refused with a message (no grill, an unknown option of the card's own, an unknown value) | unit |
 | C-6 | Options at their defaults are not saved | unit |
@@ -42,15 +42,13 @@ Sources: the approved mockup (https://claude.ai/artifact/B99qWiXfVKJG1A7KXJKKzD:
 
 ## Features
 
-The features are drawn as the Prusa Connect card's (its rows, keys, read-outs and fields): each item takes at least its minimum width (a key 36 px, a read-out or field 72 px), and a row leaves out the items that do not fit, except the switches and channels rows, which wrap so no probe or channel is left out. A value only shown (trend, rate, time left, channels) is a read-out, which does not press in under Console. A number field is typed in, or pressed and slid.
+The features are drawn as the Prusa Connect card's (its rows, keys, read-outs and fields): each item takes at least its minimum width (a key 36 px, a read-out or field 72 px), and a row leaves out the items that do not fit, except the probes and channels rows, which wrap so no probe or channel is left out. A value only shown (trend, rate, time left, channels) is a read-out, which does not press in under Console. A number field is typed in, or pressed and slid.
 
 Each feature is offered only on a tile card for its kind of entity (a grill, or a probe), is 42 px tall, and never wraps or overflows; keys never narrower than 36 px. A feature with nothing to show takes no place. Unavailable controls are dimmed in place.
 
 | ID | Behavior | Check |
 | --- | --- | --- |
-| F-1 | Sous Chef switches: a key for each probe beside the grill's name, the keys sharing the feature's width, its thermometer in the probe's color; pressed and solid while on, with its temperature (68°). A tap turns the probe's Active switch on or off. Editor: Keys show (Temperature while on, Icon only) | real HA |
-| F-10 | Sous Chef probes: a tile for each probe that is on (see Probe tile), among the grill's features where it is placed, as wide as the card; none while no probe is on. Its editor is Home Assistant's own features editor for a probe: each probe's features, their order, and the pencil opens each one's editor; at the defaults (progress, cook, channels, timing) nothing is saved. Without a probe, it says to add one in Sous Chef | real HA |
-| F-11 | Sous Chef heat: one row, a bar from blue to red; the low and high alarms marked with their numbers above, the range outside them shaded; the reading as a marker on the bar, with an arrow left or right for its trend (from 0.5°/min, doubled from 3°/min), red while past an alarm. The alarms' range sits in the middle with a quarter of it past each; without an alarm, 50 degrees past the reading. A tap opens the grill | unit (heatScale), real HA |
+| F-1 | Sous Chef probes: a key for each probe beside the grill's name, the keys sharing the feature's width, its thermometer in the probe's color; pressed and solid while on, with its temperature (68°). A tap turns the probe's Active switch on or off. Editor: Show its temperature or the probe icon | real HA |
 | F-2 | Sous Chef history: Home Assistant's history graph card of the last hour (Hours to show in the editor), the grill in orange, each probe that is on in its color and its target the same color dimmed (as the Prusa Connect card). The axis ends on a round step (5 to 100 degrees, about five lines), at least 20 degrees, so it never shows decimals or an odd end label. On a style, its screen, text and grid lines are in the finish's colors | unit (axisRange), real HA |
 | F-3 | History projections: a key at the graph's top right; on, the hour ahead is drawn beside the graph on its own scale, dashed: each probe toward its target (reached at its Done at time), the grill level, with a line at now. The choice is remembered in this browser. Editor: Projections key on or off, and Home Assistant's history graph options (hours to show, expand legend, minimum and maximum Y axis, fit Y axis to the data); a Y axis set there replaces the round step | real HA |
 | F-4 | Sous Chef ambient: the grill's trend (°/min over the last five minutes, with a trending icon), then its low and high alarms as icon and number fields, typed in place; empty is Off; a field turns red while the grill is past it. Editor: Controls (which, and their order) | unit (trendOf, editor), real HA |
@@ -72,7 +70,7 @@ Each feature is offered only on a tile card for its kind of entity (a grill, or 
 | ID | Behavior | Check |
 | --- | --- | --- |
 | E-1 | The tile card's own editor for the grill: its entity picker offers only grills (with a helper), and Content, Interactions and Features are Home Assistant's, without Icon | real HA |
-| E-2 | The Sous Chef section: Style, Icon, Features style (only with a style), Tap the title to fold the card, and Manage Sous Chef (Sous Chef's page) | real HA |
+| E-2 | The Sous Chef section: Style, Icon, Features style (only with a style), Tap the card to show or hide the probes, and Manage Sous Chef (Sous Chef's page) | real HA |
 | E-3 | State content offers the grill's `cook` | real HA |
 | E-4 | Each feature with choices has an editor, as the Prusa Connect card's: Controls (a list to choose and reorder) and its options; only what differs from the defaults is saved | unit (editor), real HA |
 

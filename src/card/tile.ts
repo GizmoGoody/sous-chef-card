@@ -255,7 +255,7 @@ export class SousChefTile extends LitElement {
    * with nothing to show (a one-sensor probe's channels) takes no place.
    */
   private _placeFeatures(): void {
-    const group = this._tile?.shadowRoot?.querySelector<HTMLElement>("hui-card-features") ?? undefined;
+    const group = findAllDeep(this._tile?.shadowRoot, "hui-card-features")[0] as HTMLElement | undefined;
     const all = [...(group?.shadowRoot?.querySelectorAll<HTMLElement>("hui-card-feature") ?? [])];
     const items = all.filter((item) => item.style.display !== "none");
     const key = JSON.stringify(all.map((item) => items.indexOf(item)));
@@ -274,7 +274,7 @@ export class SousChefTile extends LitElement {
    * a feature beside the title, Home Assistant sets the others two to a row.
    */
   private _fullWidth(): void {
-    for (const group of this._tile?.shadowRoot?.querySelectorAll<HTMLElement>('hui-card-features:not([slot="features-inline"])') ?? []) {
+    for (const group of findAllDeep(this._tile?.shadowRoot, 'hui-card-features:not([slot="features-inline"])')) {
       for (const item of group.shadowRoot?.querySelectorAll<HTMLElement>("hui-card-feature") ?? []) {
         if (item.style.gridColumn !== "1 / -1") item.style.gridColumn = "1 / -1";
       }

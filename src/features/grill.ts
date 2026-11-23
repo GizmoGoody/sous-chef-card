@@ -5,9 +5,9 @@
 import { css, html, nothing, svg, type TemplateResult } from "lit";
 import { styleMap } from "lit/directives/style-map.js";
 import { FEATURES, GRILL_COLOR } from "../const";
-import { cssColor, darkMode, dim, entityName, findDeep, moreInfo, toHex, type Config, type HomeAssistant } from "../ha";
+import { cssColor, darkMode, dim, entityName, findDeep, moreInfo, numberOf, toHex, type Config, type HomeAssistant } from "../ha";
 import {
-  allProbes, axisRange, colorOf, cookBar, doneAtOf, internalSensor, internalValue, isActive, probeNames, rateIcon, rateText, statusOf,
+  allProbes, axisRange, colorOf, cookBar, doneAtOf, internalSensor, internalValue, isActive, probeNames, rateIcon, rateText, statusOf, trendOf,
   valueOf, whole, type Probe,
 } from "../sous-chef";
 import { readout, SousChefFeature } from "./base";
@@ -15,7 +15,6 @@ import type { FeatureForm } from "./form";
 import { numberField } from "./field";
 import { ITEM_MIN } from "./rows";
 import { featureStyles } from "./styles";
-import { GrillTrend } from "./trend";
 
 const probeEntityIds = (probe: Probe): string[] =>
   [...Object.values(probe.entities), ...probe.channels, ...(probe.internal ? [probe.internal] : [])].filter((id): id is string => !!id);
@@ -24,9 +23,9 @@ const probeEntityIds = (probe: Probe): string[] =>
  * A key for each probe: its color, pressed while it is on, with its
  * temperature (or its icon); a tap turns it on or off (its Active switch).
  */
-export class SousChefSwitches extends SousChefFeature {
-  static override tag = FEATURES.switches;
-  static override pickerName = "Sous Chef switches";
+export class SousChefProbes extends SousChefFeature {
+  static override tag = FEATURES.probes;
+  static override pickerName = "Sous Chef probes";
   static override forKind = "grill" as const;
   static override options = [{
     name: "show", label: "Keys show", default: "temperatures",
@@ -77,7 +76,8 @@ export class SousChefAmbient extends SousChefFeature {
   static override forKind = "grill" as const;
   static override controls: [string, string][] = [["trend", "Trend"], ["low", "Low alarm"], ["high", "High alarm"]];
 
-  private _trend = new GrillTrend(this);
+  private _samples: [number, number][] = [];
+  private _loaded?: string;
   private _clock?: ReturnType<typeof setInterval>;
 
   override connectedCallback(): void {
@@ -90,11 +90,44 @@ export class SousChefAmbient extends SousChefFeature {
     clearInterval(this._clock);
   }
 
+  /** The grill's readings of the last ten minutes, from Home Assistant's history. */
+  private async _load(sensor: string): Promise<void> {
+    this._loaded = sensor;
+    try {
+      const start = new Date(Date.now() - 10 * 60000).toISOString();
+      const result = await this._hass!.callWS<Record<string, { s: string; lu: number }[]>>({
+        type: "history/history_during_period", start_time: start, entity_ids: [sensor],
+        minimal_response: true, no_attributes: true, significant_changes_only: false,
+      });
+      const past = (result?.[sensor] ?? []).map((row): [number, number] => [row.lu * 1000, Number(row.s)]).filter(([, v]) => Number.isFinite(v));
+      this._samples = [...past, ...this._samples].sort((a, b) => a[0] - b[0]);
+      this.requestUpdate();
+    } catch {
+      // Without history, the trend follows the readings from now on
+    }
+  }
+
+  private _sample(sensor: string): void {
+    const stateObj = this._hass!.states[sensor];
+    const value = numberOf(stateObj);
+    if (value === undefined) return;
+    const t = Date.parse(stateObj.last_updated ?? "") || Date.now();
+    const last = this._samples[this._samples.length - 1];
+    if (!last || last[0] !== t) this._samples.push([t, value]);
+    const keep = Date.now() - 15 * 60000;
+    while (this._samples.length && this._samples[0][0] < keep) this._samples.shift();
+  }
+
   protected override render(): TemplateResult | typeof nothing {
     const hass = this._hass!, ambient = this.ambient;
     this.showNothing(!ambient || !this.chosen().length);
     if (!ambient || !this.chosen().length) return nothing;
-    const rate = this._trend.rate(hass, ambient.sensor);
+    if (this._loaded !== ambient.sensor) {
+      this._samples = [];
+      this._load(ambient.sensor);
+    }
+    this._sample(ambient.sensor);
+    const rate = trendOf(this._samples);
     const value = valueOf(hass, ambient.sensor);
     const alarm = hass.states[ambient.alarm]?.state === "on";
     const low = valueOf(hass, ambient.low), high = valueOf(hass, ambient.high);
@@ -125,10 +158,6 @@ type Chart = {
 };
 
 const HOURS = 1;
-// The graph's height (px): with one probe on, more for each probe after it, up to the most
-const HISTORY_HEIGHT = 240;
-const HISTORY_PER_PROBE = 24;
-const HISTORY_MAX = 360;
 // The share of the width the projections take, right of the history
 const AHEAD = 0.3;
 
@@ -180,11 +209,11 @@ export class SousChefHistory extends SousChefFeature {
           visible: { condition: "or", conditions: [{ field: "min_y_axis", operator: "exists" }, { field: "max_y_axis", operator: "exists" }] },
         },
       ],
-      // Numbers left empty stay empty, as in Home Assistant's own editor; the legend folded, as Home Assistant's graph has it
+      // Numbers left empty stay empty, as in Home Assistant's own editor; the legend is expanded unless turned off
       data: (c) => ({
         ...base.data(c),
         hours_to_show: c.hours_to_show, min_y_axis: c.min_y_axis, max_y_axis: c.max_y_axis,
-        expand_legend: c.expand_legend === true, fit_y_data: c.fit_y_data === true,
+        expand_legend: c.expand_legend !== false, fit_y_data: c.fit_y_data === true,
       }),
     };
   }
@@ -273,7 +302,7 @@ export class SousChefHistory extends SousChefFeature {
     const c = this._config!;
     const config: Config = {
       type: "history-graph", entities, hours_to_show: Number(c.hours_to_show) > 0 ? Number(c.hours_to_show) : HOURS,
-      ...(c.expand_legend === true ? { expand_legend: true } : {}), grid_options: { rows: 4 },
+      expand_legend: c.expand_legend !== false, grid_options: { rows: 4 },
     };
     if (Number.isFinite(c.min_y_axis) || Number.isFinite(c.max_y_axis)) {
       // The axis as set in the editor, as Home Assistant's own graph takes it
@@ -371,10 +400,7 @@ export class SousChefHistory extends SousChefFeature {
     this._ahead = this._projected ? this._projections() : [];
     const s = this._scale;
     const y = (v: number) => (s && s.max > s.min ? s.top + ((s.max - v) / (s.max - s.min)) * (s.bottom - s.top) : -100);
-    // Taller as more probes are on, so the lines keep their room beside the legend
-    const lines = allProbes(hass).filter((p) => isActive(hass, p)).length;
-    const height = `${Math.min(HISTORY_MAX, HISTORY_HEIGHT + Math.max(0, lines - 1) * HISTORY_PER_PROBE)}px`;
-    return html`<div class="box ${this._projected ? "projected" : ""}" style=${styleMap({ ...palette, "--sc-history-height": height })}>
+    return html`<div class="box ${this._projected ? "projected" : ""}" style=${styleMap(palette)}>
       <div class="graph">${this._graph ?? nothing}</div>
       <div class="ahead" aria-hidden="true">
         <svg>

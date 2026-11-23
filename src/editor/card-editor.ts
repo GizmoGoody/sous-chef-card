@@ -25,7 +25,7 @@ function schemaFor(style: string): Config[] {
       helper: "Match: the controls sit on the finish. Flat: on a plain patch of it. Console: keys that press in.",
       selector: select(FEATURES_STYLES),
     }]),
-    { name: "fold", label: "Tap the title to fold the card", helper: "Folded, the card shows only its title row.", selector: { boolean: {} } },
+    { name: "probes_toggle", label: "Tap the card to show or hide the probes", selector: { boolean: {} } },
   ];
 }
 

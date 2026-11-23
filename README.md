@@ -19,7 +19,7 @@ Add the **Sous Chef** card to a dashboard. In its editor:
   - **Style**: a grill's finish behind the whole card. Stainless steel (brushed: Napoleon, Lynx, Blaze, Recteq), Bull (polished stainless with rivets), Black porcelain (Weber kettles, Traeger Ironwood and Timberline), Traeger bronze (Traeger Pro), Big Green Egg, Kamado Joe, or None (your theme).
   - **Icon**: Grill, or Bull, Weber, Traeger, Big Green Egg or Kamado Joe: the brand's small mark, without its name. Big Green Egg has no mark without its name, so it is a green egg.
   - **Features style** (with a style): Match (the controls sit on the finish), Flat (on a plain patch of it) or Console (keys that press in).
-  - **Tap the title to fold the card**: on by default. Folded, the card keeps only its title row (with the feature beside the title). This browser remembers which.
+  - **Tap the card to show or hide the probes**: on by default. Folded, the card keeps only its title row (with the feature beside the title). This browser remembers which.
   - **Manage Sous Chef**: opens the Sous Chef page, where probes, ambient sensors and foods are added.
 
 ### The grill
@@ -34,10 +34,8 @@ A probe appears once it is on: taken off its charger, its key tapped, or its Act
 
 On the grill:
 
-- **Sous Chef switches**: a key for each probe beside the grill's name, sharing its width, pressed while it is on, with its temperature. Tap one to turn the probe on or off. Options: Keys show the temperature while on, or the icon only.
-- **Sous Chef probes**: a tile for each probe that is on. Its editor is Home Assistant's own features editor: choose each probe's features, their order, and each one's options. Remove it, and the card shows no probe tiles.
-- **Sous Chef heat**: the grill's temperature on a heat map, one row: blue to red, the low and high alarms marked with the range outside them shaded, and the reading as a marker with an arrow for its trend (doubled when it moves fast). The marker turns red past an alarm.
-- **Sous Chef history**: Home Assistant's history graph of the last hour: the grill in orange, each probe that is on in its color, and its target the same color dimmed. The graph grows taller as more probes are on, and its legend is folded unless Expand legend is on. The key at the top right shows projected temperatures for the hour ahead. The axis is in whole degrees, and on a style the graph takes the finish's colors. Options: the projections key, and Home Assistant's history graph options (hours to show, expand legend, Y axis).
+- **Sous Chef probes**: a key for each probe beside the grill's name, sharing its width, pressed while it is on, with its temperature. Tap one to turn the probe on or off. Options: show the temperature or the probe icon.
+- **Sous Chef history**: Home Assistant's history graph of the last hour: the grill in orange, each probe that is on in its color, and its target the same color dimmed. The key at the top right shows projected temperatures for the hour ahead. The axis is in whole degrees, and on a style the graph takes the finish's colors. Options: the projections key, and Home Assistant's history graph options (hours to show, expand legend, Y axis).
 - **Sous Chef progress**: a thin bar for each probe that is on, side by side (four to a row), filled to its progress in its color, with its temperature and target over it. Options: the readings on or off.
 - **Sous Chef ambient**: the grill's trend in degrees a minute, and its low and high alarms. Type a limit in place, or press and slide on it; empty is off. Options: which controls, in which order.
 
@@ -60,10 +58,9 @@ state_content:
   - state
   - cook
 features:
-  - type: custom:sous-chef-switches
+  - type: custom:sous-chef-probes
   - type: custom:sous-chef-history
   - type: custom:sous-chef-ambient
-  - type: custom:sous-chef-probes
 features_position: inline
 style: stainless
 grill_icon: bull
@@ -75,7 +72,7 @@ features_style: match
 | `style` | `none`, `stainless`, `bull`, `black`, `bronze`, `big_green_egg`, `kamado_joe` | `none` |
 | `grill_icon` | `grill`, `bull`, `weber`, `traeger`, `big_green_egg`, `kamado_joe` | `grill` |
 | `features_style` | `match`, `flat`, `console` | `match` |
-| `fold` | `true`, `false` | `true` |
+| `probes_toggle` | `true`, `false` | `true` |
 
 Brand names and marks belong to their owners; they are shown only to match a grill.
 
