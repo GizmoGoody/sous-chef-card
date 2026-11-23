@@ -514,7 +514,7 @@ export class SousChefHistory extends SousChefFeature {
         keyY: more?.width ? more.top - box.top + (more.height - 32) / 2 : undefined,
       };
       const old = this._scale;
-      const rounded = (o: typeof scale) => JSON.stringify(Object.values(o).map((v) => (v === undefined ? null : Math.round(v))));
+      const rounded = (o: object) => JSON.stringify(Object.values(o).map((v: number | undefined) => (v === undefined ? null : Math.round(v))));
       if (!old || rounded(scale) !== rounded(old)) {
         this._scale = scale;
         this.requestUpdate();
