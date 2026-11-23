@@ -5,6 +5,7 @@
 // Tile features, which also work in any tile card for a grill or a probe:
 // - custom:sous-chef-probes    Sous Chef switches: a key for each probe beside the grill's name
 // - custom:sous-chef-probe-tiles  Sous Chef probes: a tile for each probe that is on, with the features chosen
+// - custom:sous-chef-heat      the grill's temperature on a heat map, between its alarms, with its target
 // - custom:sous-chef-history   Home Assistant's history graph, with projections
 // - custom:sous-chef-ambient   the grill's trend, and its low and high alarms
 // - custom:sous-chef-progress-bars  a thin bar for each probe that is on
@@ -26,9 +27,10 @@ import type { SousChefFeature } from "./features/base";
 import { SousChefAmbient, SousChefHistory, SousChefProbes, SousChefProgressBars } from "./features/grill";
 import { SousChefChannels, SousChefCook, SousChefProgress, SousChefTiming } from "./features/probe";
 import { SousChefProbeTiles } from "./features/probe-tiles";
+import { SousChefHeat } from "./features/heat";
 
 // In the order Home Assistant's feature picker lists them
-const FEATURES: (typeof SousChefFeature)[] = [SousChefProbes, SousChefProbeTiles, SousChefHistory, SousChefAmbient, SousChefProgressBars, SousChefProgress, SousChefCook, SousChefChannels, SousChefTiming];
+const FEATURES: (typeof SousChefFeature)[] = [SousChefProbes, SousChefProbeTiles, SousChefHistory, SousChefAmbient, SousChefHeat, SousChefProgressBars, SousChefProgress, SousChefCook, SousChefChannels, SousChefTiming];
 
 if (!customElements.get(CARD_TYPE)) {
   for (const feature of FEATURES) {

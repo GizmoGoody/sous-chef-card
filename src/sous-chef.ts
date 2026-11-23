@@ -46,6 +46,9 @@ export interface Ambient {
   alarm: string;
   low?: string;
   high?: string;
+  // The grill's target (a number; 0 is none) and its cook style (a select of presets, each with its target and alarms)
+  target?: string;
+  style?: string;
 }
 
 export type Status = "off" | "alarm" | "done" | "stalled" | "no_reading" | "cooking";
@@ -102,9 +105,12 @@ export function ambients(hass: HomeAssistant): Ambient[] {
     .flatMap((entry) => {
       const sensor = hass.states[entry.entity_id]?.attributes.sensor;
       if (typeof sensor !== "string") return [];
-      const limit = (key: string) => entries.find((e) => e.device_id === entry.device_id && e.translation_key === key
-        && domainOf(e.entity_id) === "number")?.entity_id;
-      return [{ sensor, alarm: entry.entity_id, low: limit("alarm_low"), high: limit("alarm_high") }];
+      const find = (key: string, domain = "number") => entries.find((e) => e.device_id === entry.device_id && e.translation_key === key
+        && domainOf(e.entity_id) === domain)?.entity_id;
+      return [{
+        sensor, alarm: entry.entity_id, low: find("alarm_low"), high: find("alarm_high"),
+        target: find("target"), style: find("cook_style", "select"),
+      }];
     });
 }
 
@@ -405,4 +411,36 @@ export function horizons(untilDone: number): number[] {
 export function aheadText(minutes: number): string {
   const h = Math.floor(minutes / 60), m = Math.round(minutes % 60);
   return h ? `+${h} h${m ? ` ${m} min` : ""}` : `+${m} min`;
+}
+
+/**
+ * The grill's heat scale (Sous Chef heat): from below its low alarm to above
+ * its high alarm, so the range between them sits in the middle, and wide
+ * enough for its target. Without an alarm, 50 degrees past the reading on
+ * that side. Positions are 0 to 1, clamped to the ends; an alarm or target
+ * of 0 is off.
+ */
+export function heatScale(value: number | undefined, low: number | undefined, high: number | undefined, target?: number):
+  { min: number; max: number; at(v: number): number } | undefined {
+  const lo = low && low > 0 ? low : undefined, hi = high && high > 0 && (lo === undefined || high > lo) ? high : undefined;
+  const goal = target && target > 0 ? target : undefined;
+  const center = value ?? goal ?? lo ?? hi;
+  if (center === undefined) return undefined;
+  const margin = lo !== undefined && hi !== undefined ? Math.max((hi - lo) * 0.25, 10) : 50;
+  let min = (lo ?? Math.min(center, hi ?? center)) - margin, max = (hi ?? Math.max(center, lo ?? center)) + margin;
+  // Without both alarms, the reading always shows on the scale; the target always does
+  if ((lo === undefined || hi === undefined) && value !== undefined) {
+    min = Math.min(min, value - 10);
+    max = Math.max(max, value + 10);
+  }
+  if (goal !== undefined) {
+    min = Math.min(min, goal - 10);
+    max = Math.max(max, goal + 10);
+  }
+  return { min, max, at: (v: number) => Math.min(1, Math.max(0, (v - min) / (max - min))) };
+}
+
+/** A cook style's name with its target, as its list shows it: Smoke · 225°. */
+export function styleLabel(name: string, preset?: { target?: number }): string {
+  return preset?.target ? `${name} · ${Math.round(preset.target)}°` : name;
 }

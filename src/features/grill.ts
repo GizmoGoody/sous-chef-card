@@ -5,14 +5,15 @@
 import { css, html, nothing, svg, type TemplateResult } from "lit";
 import { styleMap } from "lit/directives/style-map.js";
 import { FEATURES, GRILL_COLOR } from "../const";
-import { adopt, cssColor, darkMode, dim, entityName, findDeep, moreInfo, numberOf, sheetOf, toHex, type Config, type HomeAssistant } from "../ha";
+import { adopt, cssColor, darkMode, dim, entityName, findDeep, moreInfo, sheetOf, toHex, type Config, type HomeAssistant } from "../ha";
 import {
-  aheadText, allProbes, axisRange, colorOf, cookBar, horizons, iconColorOf, doneAtOf, internalSensor, internalValue, isActive, probeNames, rateIcon, rateText, statusOf, trendOf,
+  aheadText, allProbes, axisRange, colorOf, cookBar, horizons, iconColorOf, doneAtOf, internalSensor, internalValue, isActive, probeNames, rateIcon, rateText, statusOf, styleLabel, CUSTOM,
   valueOf, whole, type Probe,
 } from "../sous-chef";
 import { readout, SousChefFeature } from "./base";
 import type { FeatureForm } from "./form";
-import { numberField } from "./field";
+import { numberField, type FieldMenu } from "./field";
+import { GrillTrend } from "./trend";
 import { ITEM_MIN } from "./rows";
 import { featureStyles } from "./styles";
 
@@ -76,10 +77,9 @@ export class SousChefAmbient extends SousChefFeature {
   static override tag = FEATURES.ambient;
   static override pickerName = "Sous Chef ambient";
   static override forKind = "grill" as const;
-  static override controls: [string, string][] = [["trend", "Trend"], ["low", "Low alarm"], ["high", "High alarm"]];
+  static override controls: [string, string][] = [["trend", "Trend"], ["target", "Target or cook style"], ["low", "Low alarm"], ["high", "High alarm"]];
 
-  private _samples: [number, number][] = [];
-  private _loaded?: string;
+  private _trend = new GrillTrend(this);
   private _clock?: ReturnType<typeof setInterval>;
 
   override connectedCallback(): void {
@@ -92,51 +92,38 @@ export class SousChefAmbient extends SousChefFeature {
     clearInterval(this._clock);
   }
 
-  /** The grill's readings of the last ten minutes, from Home Assistant's history. */
-  private async _load(sensor: string): Promise<void> {
-    this._loaded = sensor;
-    try {
-      const start = new Date(Date.now() - 10 * 60000).toISOString();
-      const result = await this._hass!.callWS<Record<string, { s: string; lu: number }[]>>({
-        type: "history/history_during_period", start_time: start, entity_ids: [sensor],
-        minimal_response: true, no_attributes: true, significant_changes_only: false,
-      });
-      const past = (result?.[sensor] ?? []).map((row): [number, number] => [row.lu * 1000, Number(row.s)]).filter(([, v]) => Number.isFinite(v));
-      this._samples = [...past, ...this._samples].sort((a, b) => a[0] - b[0]);
-      this.requestUpdate();
-    } catch {
-      // Without history, the trend follows the readings from now on
-    }
-  }
-
-  private _sample(sensor: string): void {
-    const stateObj = this._hass!.states[sensor];
-    const value = numberOf(stateObj);
-    if (value === undefined) return;
-    const t = Date.parse(stateObj.last_updated ?? "") || Date.now();
-    const last = this._samples[this._samples.length - 1];
-    if (!last || last[0] !== t) this._samples.push([t, value]);
-    const keep = Date.now() - 15 * 60000;
-    while (this._samples.length && this._samples[0][0] < keep) this._samples.shift();
+  /** The cook styles' list over the target: each with its target; Custom types one in, and slides. */
+  private _styles(): FieldMenu | undefined {
+    const hass = this._hass!, ambient = this.ambient!, stateObj = ambient.style ? hass.states[ambient.style] : undefined;
+    if (!stateObj) return undefined;
+    const presets: Record<string, { target?: number }> = stateObj.attributes.presets ?? {};
+    const options: string[] = Array.isArray(stateObj.attributes.options) ? stateObj.attributes.options : [];
+    return {
+      options: options.map((value) => ({ value, label: styleLabel(hass.formatEntityState(stateObj, value), presets[value]) })),
+      selected: stateObj.state, custom: CUSTOM,
+      choose: (option) => this.call("select", "select_option", { entity_id: ambient.style, option }),
+    };
   }
 
   protected override render(): TemplateResult | typeof nothing {
     const hass = this._hass!, ambient = this.ambient;
     this.showNothing(!ambient || !this.chosen().length);
     if (!ambient || !this.chosen().length) return nothing;
-    if (this._loaded !== ambient.sensor) {
-      this._samples = [];
-      this._load(ambient.sensor);
-    }
-    this._sample(ambient.sensor);
-    const rate = trendOf(this._samples);
+    const rate = this._trend.rate(hass, ambient.sensor);
     const value = valueOf(hass, ambient.sensor);
     const alarm = hass.states[ambient.alarm]?.state === "on";
     const low = valueOf(hass, ambient.low), high = valueOf(hass, ambient.high);
     const title = `Grill trend: ${rate === undefined ? "unknown" : rateText(rate)}`;
+    const styles = this._styles();
+    const style = ambient.style ? hass.states[ambient.style] : undefined;
     const controls: Record<string, () => unknown> = {
       trend: () => readout(title, () => moreInfo(this, ambient.sensor),
         html`<ha-icon .icon=${rateIcon(rate, 0.5)}></ha-icon>${rate === undefined ? html`<span class="note">Trend</span>` : html`<span>${rateText(rate)}</span>`}`),
+      target: () => numberField(hass, ambient.target, {
+        icon: "mdi:target", placeholder: "Target", empty: 0,
+        title: style ? `Cook style: ${hass.formatEntityState(style)}` : "Grill target",
+        menu: styles, slide: !styles || styles.selected === CUSTOM,
+      }),
       low: () => numberField(hass, ambient.low, {
         icon: "mdi:thermometer-chevron-down", placeholder: "Off", empty: 0,
         title: "Low alarm: Sous Chef alerts when the grill falls below it",
@@ -149,6 +136,12 @@ export class SousChefAmbient extends SousChefFeature {
       }),
     };
     return html`<div class="row" style=${styleMap({ "--c": cssColor(GRILL_COLOR) })}>${this.chosen().map((id) => controls[id]())}</div>`;
+  }
+
+  // The reading, the alarms, the target and the cook style
+  protected override watched(): string[] {
+    const a = this.ambient;
+    return a ? [a.sensor, a.alarm, a.low, a.high, a.target, a.style].filter((id): id is string => !!id) : [];
   }
 }
 
@@ -334,6 +327,10 @@ export class SousChefHistory extends SousChefFeature {
     const probes = allProbes(hass).filter((p) => isActive(hass, p));
     const names = probeNames(probes);
     const entities: Config[] = [{ entity: ambient.sensor, name: entityName(hass, ambient.sensor), color: hex(cssColor(GRILL_COLOR)) }];
+    // The grill's target, dimmed, as each probe's
+    if (ambient.target && (valueOf(hass, ambient.target) ?? 0) > 0) {
+      entities.push({ entity: ambient.target, name: "Grill target", color: dim(hex(cssColor(GRILL_COLOR)), this._darkScreen()) });
+    }
     for (const p of probes) {
       const reading = internalSensor(hass, p);
       const color = hex(colorOf(p));

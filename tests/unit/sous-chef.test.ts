@@ -3,7 +3,7 @@ import { featureForm } from "../../src/features/form";
 import { checkConfig, grillConfig, minimal, probeConfig, probeFeaturesOf, probeLinesOf, probeTilesOf, stubConfig, tileConfig } from "../../src/card/options";
 import type { HomeAssistant } from "../../src/ha";
 import {
-  aheadText, allProbes, ambients, axisRange, channelReadings, durationText, grillBadge, grillLine, internalSensor, probeDevices, probeLine, probeOf,
+  aheadText, allProbes, ambients, axisRange, heatScale, styleLabel, channelReadings, durationText, grillBadge, grillLine, internalSensor, probeDevices, probeLine, probeOf,
   horizons, rateText, shortNames, statusOf, statusText, trendOf,
 } from "../../src/sous-chef";
 
@@ -268,4 +268,28 @@ describe("the projections' spans", () => {
     expect(aheadText(60)).toBe("+1 h");
     expect(aheadText(15)).toBe("+15 min");
   });
+});
+
+describe("the grill's heat scale", () => {
+  it("puts the alarms' range in the middle, with a quarter of it past each alarm", () => {
+    const s = heatScale(250, 225, 275)!;
+    expect([s.min, s.max]).toEqual([212.5, 287.5]);
+    expect(s.at(250)).toBe(0.5);
+    expect(s.at(400)).toBe(1);
+  });
+  it("without an alarm, keeps the reading on the scale", () => {
+    const s = heatScale(60, 0, 0)!;
+    expect([s.min, s.max]).toEqual([10, 110]);
+    expect(heatScale(undefined, 0, 0)).toBeUndefined();
+  });
+  it("keeps the target on the scale", () => {
+    const s = heatScale(60, 350, 560, 600)!;
+    expect(s.max).toBe(612.5);
+    expect(heatScale(60, 0, 0, 0)!.max).toBe(110);
+  });
+});
+
+describe("a cook style's label", () => {
+  it("has its target", () => expect(styleLabel("Smoke", { target: 225 })).toBe("Smoke · 225°"));
+  it("is the name alone without one", () => expect(styleLabel("Custom")).toBe("Custom"));
 });

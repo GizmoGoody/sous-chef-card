@@ -21,6 +21,8 @@ export const FEATURES = {
   probes: "sous-chef-probes",
   // Sous Chef probes: a tile for each probe that is on
   probeTiles: "sous-chef-probe-tiles",
+  // Sous Chef heat: the grill's temperature on a heat map, between its alarms, with its target
+  heat: "sous-chef-heat",
   history: "sous-chef-history",
   ambient: "sous-chef-ambient",
   progress: "sous-chef-progress",
