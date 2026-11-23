@@ -22,13 +22,13 @@ type Tile = HTMLElement & {
   updateComplete?: Promise<unknown>; getCardSize?(): number; getGridOptions?(): Config;
 };
 
-// Each brand's mark: its height in the title row, and a backing where the mark needs one to read
+// Each brand's mark: its height in the title row (Traeger's mountains are wide, so lower)
 const BRAND_LOOK: Record<string, Record<string, string>> = {
-  bull: { "--sc-brand-height": "22px" },
+  bull: { "--sc-brand-height": "34px" },
   weber: { "--sc-brand-height": "36px" },
-  traeger: { "--sc-brand-height": "34px" },
-  big_green_egg: { "--sc-brand-height": "18px", "--sc-brand-padding": "6px 8px", "--sc-brand-backing": "rgba(255,255,255,.9)", "--sc-brand-radius": "18px" },
-  kamado_joe: { "--sc-brand-height": "28px", "--sc-brand-padding": "4px", "--sc-brand-backing": "rgba(255,255,255,.92)", "--sc-brand-radius": "50%" },
+  traeger: { "--sc-brand-height": "22px" },
+  big_green_egg: { "--sc-brand-height": "32px" },
+  kamado_joe: { "--sc-brand-height": "32px" },
 };
 
 // The grill is lit (its icon orange) from this temperature, in °F or °C

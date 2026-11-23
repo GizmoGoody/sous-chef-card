@@ -2,7 +2,9 @@
 // card's entity) and its configuration. A probe's features follow the
 // probe of the card's entity; the grill's follow the ambient sensor.
 import { LitElement, type CSSResultGroup, type PropertyValues } from "lit";
+import { FEATURE_EDITOR_TYPE } from "../const";
 import type { Config, FeatureContext, HomeAssistant } from "../ha";
+import { chosenOf, featureForm, type FeatureForm, type FeatureOption } from "./form";
 import { ambientOf, probeOfEntity, type Ambient, type Probe } from "../sous-chef";
 import { featureStyles } from "./styles";
 
@@ -15,14 +17,27 @@ export class SousChefFeature extends LitElement {
   // What its tile card is for: a probe, or the grill (an ambient sensor)
   static forKind: "probe" | "grill" = "probe";
 
+  // Its controls, in their default order, as [id, name]: the editor chooses and orders them (all shown by default)
+  static controls: [string, string][] = [];
+  // Its other options in the editor
+  static options: FeatureOption[] = [];
+
   static getStubConfig(): Config {
     return { type: `custom:${this.tag}` };
   }
 
-  /** Whether Home Assistant's feature picker offers it for a tile card's entity. */
-  static supports(hass: HomeAssistant | undefined, context?: FeatureContext): boolean {
-    if (!hass || !context?.entity_id) return false;
-    return this.forKind === "grill" ? !!ambientOf(hass, context.entity_id) : !!probeOfEntity(hass, context.entity_id);
+  static getConfigElement(): HTMLElement {
+    return document.createElement(FEATURE_EDITOR_TYPE);
+  }
+
+  /** Whether it has an editor: controls to choose, or options. */
+  static get configurable(): boolean {
+    return this.controls.length > 0 || this.options.length > 0;
+  }
+
+  /** The feature's editor form: its controls (chosen and ordered), then its options. */
+  static editor(): FeatureForm {
+    return featureForm(this.controls, this.options);
   }
 
   protected _config?: Config;
@@ -64,6 +79,21 @@ export class SousChefFeature extends LitElement {
     return this._context;
   }
 
+  // The class's statics, from an instance
+  private get _type(): typeof SousChefFeature {
+    return this.constructor as typeof SousChefFeature;
+  }
+
+  /** The controls chosen, in order (all, by default). */
+  protected chosen(): string[] {
+    return chosenOf(this._type.controls, this._config ?? {});
+  }
+
+  /** An option's value: the configuration's, or its default. */
+  protected option<T>(name: string): T {
+    return (this._config?.[name] ?? this._type.options.find((o) => o.name === name)?.default) as T;
+  }
+
   /** The entities the feature shows: it draws again only when one of them changes. */
   protected watched(): string[] {
     const probe = this.probe;
@@ -102,3 +132,4 @@ export class SousChefFeature extends LitElement {
     this._hass?.callService(domain, service, data);
   }
 }
+

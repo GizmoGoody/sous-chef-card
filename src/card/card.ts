@@ -2,7 +2,7 @@
 // Subwoofer panel card holds a group and its subwoofers. The grill (an
 // ambient sensor) is Home Assistant's tile card, with every tile card
 // option; below it, one tile card for each probe that is on. A tap on the
-// grill shows or hides the probes, and this browser remembers which. The
+// grill shows or hides its features and the probes, leaving the title row, and this browser remembers which. The
 // style's finish covers the whole card.
 import { html, LitElement, nothing, type TemplateResult } from "lit";
 import { classMap } from "lit/directives/class-map.js";
@@ -45,10 +45,10 @@ export class SousChefCard extends LitElement {
     this._grill ??= document.createElement(TILE_TYPE) as SousChefTile;
     this._grill.kind = "grill";
     this._grill.grillIcon = optionOf(config, "grill_icon");
-    this._grill.setConfig(grillConfig(config));
-    if (this._hass) this._grill.hass = this._hass;
     this._open = optionOf(config, "probes_toggle") === false ? true
       : this._preview ? PREVIEW_OPEN.get(config.entity) ?? true : this._storedOpen() ?? true;
+    this._grill.setConfig(grillConfig(config, this._open));
+    if (this._hass) this._grill.hass = this._hass;
     this._shown = [];
     this._syncProbes();
     this.requestUpdate();
@@ -72,6 +72,7 @@ export class SousChefCard extends LitElement {
     for (const tile of this._probes.values()) tile.preview = value;
     if (!this._config || value === was || optionOf(this._config, "probes_toggle") === false) return;
     this._open = value ? PREVIEW_OPEN.get(this._config.entity) ?? true : this._storedOpen() ?? true;
+    this._grill?.setConfig(grillConfig(this._config, this._open));
     this.requestUpdate();
   }
 
@@ -80,7 +81,7 @@ export class SousChefCard extends LitElement {
   }
 
   getCardSize(): number {
-    return 1 + (this._config?.features?.length ?? 0) * 2 + (this._open ? this._shown.length * 3 : 0);
+    return 1 + (this._open ? (this._config?.features?.length ?? 0) * 2 + this._shown.length * 3 : 0);
   }
 
   /** Half a section wide by default, as tall as its content. */
@@ -141,6 +142,7 @@ export class SousChefCard extends LitElement {
         // Storage can be unavailable (private windows); the card still works
       }
     }
+    this._grill?.setConfig(grillConfig(this._config!, this._open));
     this.requestUpdate();
   };
 
@@ -152,6 +154,9 @@ export class SousChefCard extends LitElement {
     const style = {
       "--sc-surface": finish?.surface, "--sc-border": finish?.border, "--sc-base": finish?.base,
       "--sc-features-style": features, "--sc-badge-ring": finish ? "rgba(0, 0, 0, .55)" : undefined,
+      // The history graph's screen, in the finish's colors
+      "--sc-screen": finish?.screen.background, "--sc-screen-solid": finish?.screen.solid, "--sc-screen-text": finish?.screen.text,
+      "--sc-screen-secondary": finish?.screen.secondary, "--sc-screen-grid": finish?.screen.grid,
     };
     const tiles = this._shown.map((key) => this._probes.get(key.split("|")[0])).filter((t): t is SousChefTile => !!t);
     return html`<div class=${classMap({

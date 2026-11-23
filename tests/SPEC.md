@@ -14,7 +14,7 @@ Sources: the approved mockup (https://claude.ai/artifact/B99qWiXfVKJG1A7KXJKKzD:
 | ID | Behavior | Check |
 | --- | --- | --- |
 | C-1 | One card for the grill and every probe: the grill (a Sous Chef ambient sensor) is Home Assistant's tile card on top; below it, one tile card for each probe that is on. A probe that is off takes no place | real HA |
-| C-2 | A tap on the grill shows or hides the probes; this browser remembers which, per grill. With Tap the card to show or hide the probes off, the probes always show and the grill's tap is the tile card's own | unit (grillConfig), real HA |
+| C-2 | A tap on the grill shows or hides its features below the title and the probes, leaving the title row (with the feature beside the title), as in the Prusa Connect card; this browser remembers which, per grill. With Tap the card to show or hide the probes off, the probes always show and the grill's tap is the tile card's own | unit (grillConfig), real HA |
 | C-3 | The editor's preview starts with the probes shown and changes only when tapped | real HA |
 | C-4 | Every tile card option works on the grill: name, color, state content, actions, features, features position | real HA |
 | C-5 | Wrong options are refused with a message (no grill, an unknown option of the card's own, an unknown value) | unit |
@@ -27,7 +27,7 @@ Sources: the approved mockup (https://claude.ai/artifact/B99qWiXfVKJG1A7KXJKKzD:
 | ID | Behavior | Check |
 | --- | --- | --- |
 | G-1 | Icon: the grill icon, orange once the grill is lit (120 °F, 50 °C), grey while cold; a color chosen in the tile options wins | real HA |
-| G-2 | Icon option: a brand's mark (Bull, Weber, Traeger, Big Green Egg, Kamado Joe) in place of the icon, as wide as the mark | unit (grillConfig), real HA |
+| G-2 | Icon option: Grill, or a brand (Bull, Weber, Traeger, Big Green Egg, Kamado Joe): the brand's small mark without its name, in place of the icon (Big Green Egg has none without its name, so a green egg) | unit (grillConfig), real HA |
 | G-3 | State content `cook`: the grill's alarm (Below 225 °F), else a probe that needs a look (Red alarm, Red is done, Blue stalled), else how many probes are on | unit |
 | G-4 | Badge at the icon's top right, 18 px with a 12 px icon: alarm (red), done (green), stalled (amber) | unit (grillBadge), real HA |
 
@@ -46,14 +46,14 @@ Each feature is offered only on a tile card for its kind of entity (a grill, or 
 
 | ID | Behavior | Check |
 | --- | --- | --- |
-| F-1 | Sous Chef probes: a key for each probe beside the grill's name, its thermometer in the probe's color; pressed and solid while on. A tap turns the probe's Active switch on or off | real HA |
-| F-2 | Sous Chef history: Home Assistant's history graph card of the last hour, the grill in orange, each probe that is on in its color and its target the same color dimmed | real HA |
-| F-3 | History projections: a key at the graph's top right; on, the hour ahead is drawn beside the graph on its own scale, dashed: each probe toward its target (reached at its Done at time), the grill level, with a line at now. The choice is remembered in this browser | real HA |
-| F-4 | Sous Chef ambient: the grill's trend (°/min over the last five minutes, with a trending icon), then its low and high alarms as icon and number fields, typed in place; empty is Off; a field turns red while the grill is past it | unit (trendOf), real HA |
+| F-1 | Sous Chef probes: a key for each probe beside the grill's name, its thermometer in the probe's color; pressed and solid while on, with its temperature (68°). A tap turns the probe's Active switch on or off. Editor: Show its temperature or the probe icon | real HA |
+| F-2 | Sous Chef history: Home Assistant's history graph card of the last hour (Hours to show in the editor), the grill in orange, each probe that is on in its color and its target the same color dimmed. The axis is in whole tens, at least 20 degrees, so it never shows decimals. On a style, its screen, text and grid lines are in the finish's colors | unit (axisRange), real HA |
+| F-3 | History projections: a key at the graph's top right; on, the hour ahead is drawn beside the graph on its own scale, dashed: each probe toward its target (reached at its Done at time), the grill level, with a line at now. The choice is remembered in this browser. Editor: Projections key on or off | real HA |
+| F-4 | Sous Chef ambient: the grill's trend (°/min over the last five minutes, with a trending icon), then its low and high alarms as icon and number fields, typed in place; empty is Off; a field turns red while the grill is past it. Editor: Controls (which, and their order) | unit (trendOf, editor), real HA |
 | F-5 | Sous Chef progress: a bar filled to the cook's progress in the probe's color, 88 → 130 °F on it; striped while stalled; past the target, full with a mark at the goal | real HA |
-| F-6 | Sous Chef cook: the food type key (its icon and an arrow; a tap lists the foods), the target (typed in with Custom, TARGET when empty; with a doneness, its temperature and an arrow, and a tap lists the levels), and the chart key, which opens the chart view | real HA |
-| F-7 | Sous Chef channels: one key per channel from the tip, the tip's key pointed; the coldest the faintest and the hottest the strongest; each shows its value and its difference from the reference (the lowest), which says REF. Nothing on a one-sensor probe | unit (channelReadings), real HA |
-| F-8 | Sous Chef timing: the rate (+1.6°/min) and the time left (32 min, 1 h 10 min), or once done the rest the chart asks for (Rest 5 min) | unit (rateText, durationText), real HA |
+| F-6 | Sous Chef cook: the food type key (its icon and an arrow; a tap lists the foods), the target (typed in with Custom, TARGET when empty; with a doneness, its temperature and an arrow, and a tap lists the levels), and the chart key, which opens the chart view. Editor: Controls | real HA |
+| F-7 | Sous Chef channels: one key per channel from the tip, the tip's key pointed; the coldest the faintest and the hottest the strongest; each shows its value and its difference from the reference (the lowest), which says REF. Nothing on a one-sensor probe. Editor: Differences on or off | unit (channelReadings), real HA |
+| F-8 | Sous Chef timing: the rate (+1.6°/min) and the time left (32 min, 1 h 10 min), or once done the rest the chart asks for (Rest 5 min). Editor: Controls | unit (rateText, durationText), real HA |
 
 ## Styles
 
@@ -69,6 +69,7 @@ Each feature is offered only on a tile card for its kind of entity (a grill, or 
 | E-1 | The tile card's own editor for the grill: its entity picker offers only grills (with a helper), and Content, Interactions and Features are Home Assistant's, without Icon | real HA |
 | E-2 | The Sous Chef section: Style, Icon, Features style (only with a style), Tap the card to show or hide the probes, and Manage Sous Chef (Sous Chef's page) | real HA |
 | E-3 | State content offers the grill's `cook` | real HA |
+| E-4 | Each feature with choices has an editor, as the Prusa Connect card's: Controls (a list to choose and reorder) and its options; only what differs from the defaults is saved | unit (editor), real HA |
 
 ## Chart view
 

@@ -10,6 +10,7 @@ export const CARD_TYPE = "sous-chef-card";
 export const EDITOR_TYPE = "sous-chef-card-editor";
 export const TILE_TYPE = "sous-chef-tile";
 export const TILE_EDITOR_TYPE = "sous-chef-tile-card-editor";
+export const FEATURE_EDITOR_TYPE = "sous-chef-feature-editor";
 // The Sous Chef integration's page, where probes and ambient sensors are added
 export const MANAGE_PATH = `/config/integrations/integration/${DOMAIN}`;
 
@@ -42,12 +43,12 @@ export const STYLES: [string, string][] = [
 export const FEATURES_STYLES: [string, string][] = [["match", "Match style"], ["flat", "Flat"], ["console", "Console"]];
 // The grill's icon: the grill, or a brand's mark (see grill/brand-images.ts)
 export const ICONS: [string, string][] = [
-  ["grill", "Grill icon"],
-  ["bull", "Bull brand mark"],
-  ["weber", "Weber brand mark"],
-  ["traeger", "Traeger brand mark"],
-  ["big_green_egg", "Big Green Egg brand mark"],
-  ["kamado_joe", "Kamado Joe brand mark"],
+  ["grill", "Grill"],
+  ["bull", "Bull"],
+  ["weber", "Weber"],
+  ["traeger", "Traeger"],
+  ["big_green_egg", "Big Green Egg"],
+  ["kamado_joe", "Kamado Joe"],
 ];
 
 // The badges on a tile's icon, by what they say

@@ -3,7 +3,7 @@
 //   node scripts/brands.mjs
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 
-const TYPES = { svg: "image/svg+xml", png: "image/png" };
+const TYPES = { svg: "image/svg+xml", png: "image/png", webp: "image/webp" };
 const lines = readdirSync("assets/brands").sort().map((file) => {
   const [name, ext] = file.split(".");
   const data = readFileSync(`assets/brands/${file}`).toString("base64");

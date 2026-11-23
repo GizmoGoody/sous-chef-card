@@ -77,6 +77,7 @@ function optionsOf(hass: SousChefFeature["hass"], stateObj?: HassEntity): { valu
 export class SousChefCook extends SousChefFeature {
   static override tag = FEATURES.cook;
   static override pickerName = "Sous Chef cook";
+  static override controls: [string, string][] = [["food", "Food type"], ["target", "Target or doneness"], ["chart", "Chart view"]];
 
   static override styles = [featureStyles, css`
     .food { flex: 0 0 60px; }
@@ -98,8 +99,8 @@ export class SousChefCook extends SousChefFeature {
 
   protected override render(): TemplateResult | typeof nothing {
     const hass = this._hass!, probe = this.probe;
-    this.showNothing(!probe);
-    if (!probe) return nothing;
+    this.showNothing(!probe || !this.chosen().length);
+    if (!probe || !this.chosen().length) return nothing;
     const e = probe.entities;
     const food = e.food_type ? hass.states[e.food_type] : undefined;
     const doneness = e.doneness ? hass.states[e.doneness] : undefined;
@@ -107,24 +108,26 @@ export class SousChefCook extends SousChefFeature {
     const custom = !doneness || doneness.state === CUSTOM;
     const foodName = food ? hass.formatEntityState(food) : "";
     const level = doneness ? hass.formatEntityState(doneness) : "";
-    return html`<div class="row" style=${styleMap({ "--c": colorOf(probe) })}>
-      ${food ? html`<label class="key food" title="Food type: ${foodName}">
+    const chosen = this.chosen();
+    const controls: Record<string, () => unknown> = {
+      food: () => food ? html`<label class="key food" title="Food type: ${foodName}">
         <ha-state-icon .hass=${hass} .stateObj=${food}></ha-state-icon><ha-icon class="arrow" icon="mdi:menu-down"></ha-icon>
         ${this._menu(e.food_type, food, "Food type")}
-      </label>` : nothing}
-      ${custom
+      </label>` : nothing,
+      target: () => custom
         ? numberField(hass, e.target, { placeholder: "Target", title: "Target: type it in" })
         : html`<label class="field preset" title="Doneness: ${level}${target !== undefined ? `, ${whole(target)}°` : ""}">
             ${target !== undefined ? html`<span class="num">${whole(target)}°</span>` : html`<span class="note">Target</span>`}
             <ha-icon class="arrow" icon="mdi:menu-down"></ha-icon>
             ${this._menu(e.doneness, doneness, "Doneness")}
-          </label>`}
-      <button type="button" class="key chart" title="Chart view: pick from a chart" aria-label="Chart view"
+          </label>`,
+      chart: () => html`<button type="button" class="key chart" title="Chart view: pick from a chart" aria-label="Chart view"
         ?disabled=${!e.source || !e.food_type || !e.doneness}
         @click=${() => showChartDialog(this, { name: probe.name, source: e.source, food_type: e.food_type, doneness: e.doneness, target: e.target })}>
         <ha-icon icon="mdi:book-open-variant"></ha-icon>
-      </button>
-    </div>`;
+      </button>`,
+    };
+    return html`<div class="row" style=${styleMap({ "--c": colorOf(probe) })}>${chosen.map((id) => controls[id]())}</div>`;
   }
 }
 
@@ -136,6 +139,9 @@ export class SousChefCook extends SousChefFeature {
 export class SousChefChannels extends SousChefFeature {
   static override tag = FEATURES.channels;
   static override pickerName = "Sous Chef channels";
+  static override options = [{
+    name: "deltas", label: "Differences", helper: "Each channel's difference from the reference, under its temperature", default: true, selector: { boolean: {} },
+  }];
 
   static override styles = [featureStyles, css`
     .key { flex-direction: column; gap: 1px; padding: 0; font-size: 13px; }
@@ -153,6 +159,7 @@ export class SousChefChannels extends SousChefFeature {
     if (!probe || !multi) return nothing;
     const reading = statusOf(hass, probe) !== "no_reading";
     const unit = hass.states[probe.channels[0]]?.attributes.unit_of_measurement ?? "°";
+    const deltas = this.option<boolean>("deltas") !== false;
     const channels = channelReadings(probe.channels.map((id) => (reading ? valueOf(hass, id) : undefined)), probe.channels);
     return html`<div class="row tight" style=${styleMap({ "--c": colorOf(probe) })}>
       ${channels.map((ch, i) => {
@@ -161,7 +168,7 @@ export class SousChefChannels extends SousChefFeature {
         return html`<button type="button" class="key ${ch.tip ? "tip" : ""}" title=${title} aria-label=${title}
           style=${styleMap({ "--tint": (0.14 + 0.5 * ch.heat).toFixed(2) })} @click=${() => moreInfo(this, ch.id)}>
           <span class="value num">${ch.value === undefined ? "" : whole(ch.value)}</span>
-          <span class="delta ${ch.reference ? "ref" : ""}">${ch.value === undefined ? "" : ch.reference ? "Ref" : `+${ch.delta}°`}</span>
+          ${deltas ? html`<span class="delta ${ch.reference ? "ref" : ""}">${ch.value === undefined ? "" : ch.reference ? "Ref" : `+${ch.delta}°`}</span>` : nothing}
         </button>`;
       })}
     </div>`;
@@ -172,6 +179,7 @@ export class SousChefChannels extends SousChefFeature {
 export class SousChefTiming extends SousChefFeature {
   static override tag = FEATURES.timing;
   static override pickerName = "Sous Chef timing";
+  static override controls: [string, string][] = [["rate", "Rate"], ["time", "Time left, or the rest"]];
 
   private _clock?: ReturnType<typeof setInterval>;
 
@@ -188,8 +196,8 @@ export class SousChefTiming extends SousChefFeature {
 
   protected override render(): TemplateResult | typeof nothing {
     const hass = this._hass!, probe = this.probe;
-    this.showNothing(!probe);
-    if (!probe) return nothing;
+    this.showNothing(!probe || !this.chosen().length);
+    if (!probe || !this.chosen().length) return nothing;
     const e = probe.entities;
     const status = statusOf(hass, probe);
     const reading = status !== "no_reading" && status !== "off";
@@ -200,14 +208,15 @@ export class SousChefTiming extends SousChefFeature {
     const left = !reading ? "" : done ? (rest > 0 ? `Rest ${rest} min` : "") : at && at.getTime() > Date.now() ? durationText(at.getTime() - Date.now()) : "";
     const rateTitle = `Rate: ${rate === undefined ? "unknown" : `${rateText(rate)}`}`;
     const timeTitle = done ? `Rest from the chart${rest > 0 ? `: ${rest} min` : ""}` : `Time left: ${left || "unknown"}`;
-    return html`<div class="row" style=${styleMap({ "--c": colorOf(probe) })}>
-      <button type="button" class="key" title=${rateTitle} aria-label=${rateTitle} @click=${() => moreInfo(this, e.rate)}>
+    const controls: Record<string, () => unknown> = {
+      rate: () => html`<button type="button" class="key" title=${rateTitle} aria-label=${rateTitle} @click=${() => moreInfo(this, e.rate)}>
         <ha-icon .icon=${rateIcon(rate, 0.3)}></ha-icon>${rate === undefined ? html`<span class="note">Rate</span>` : html`<span class="num">${rateText(rate)}</span>`}
-      </button>
-      <button type="button" class="key" title=${timeTitle} aria-label=${timeTitle} @click=${() => moreInfo(this, done ? e.doneness : e.done_at)}>
+      </button>`,
+      time: () => html`<button type="button" class="key" title=${timeTitle} aria-label=${timeTitle} @click=${() => moreInfo(this, done ? e.doneness : e.done_at)}>
         <ha-icon .icon=${done ? "mdi:timer-sand" : "mdi:timer-outline"}></ha-icon>${left ? html`<span class="num">${left}</span>` : html`<span class="note">${done ? "Done" : "Time left"}</span>`}
-      </button>
-    </div>`;
+      </button>`,
+    };
+    return html`<div class="row" style=${styleMap({ "--c": colorOf(probe) })}>${this.chosen().map((id) => controls[id]())}</div>`;
   }
 
   // The internal temperature changes the rate and time left

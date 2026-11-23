@@ -28,15 +28,13 @@ export const cardStyles = css`
   .dark {
     --primary-text-color: rgba(255, 255, 255, .95); --secondary-text-color: rgba(235, 235, 240, .7);
     --disabled-text-color: rgba(255, 255, 255, .38);
-    --sc-text: rgba(255, 255, 255, .95); --sc-scrim: rgba(0, 0, 0, .3); --sc-screen: rgba(10, 10, 14, .82);
+    --sc-text: rgba(255, 255, 255, .95); --sc-scrim: rgba(0, 0, 0, .3);
   }
   .light {
     --primary-text-color: rgba(0, 0, 0, .85); --secondary-text-color: rgba(40, 40, 48, .7);
     --disabled-text-color: rgba(0, 0, 0, .38);
-    --sc-text: rgba(0, 0, 0, .85); --sc-scrim: rgba(255, 255, 255, .5); --sc-screen: rgba(10, 10, 14, .82);
+    --sc-text: rgba(0, 0, 0, .85); --sc-scrim: rgba(255, 255, 255, .5);
   }
-  /* The history is a dark screen on any finish */
-  .finished { --sc-screen-text: rgba(255, 255, 255, .9); }
   /* Flat and Console: each control on a plain patch of the finish */
   .solid { --sc-backing: var(--sc-base); }
   .probes { display: grid; }

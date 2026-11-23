@@ -7,8 +7,8 @@ import { styleMap } from "lit/directives/style-map.js";
 import { FEATURES, GRILL_COLOR } from "../const";
 import { cssColor, darkMode, dim, entityName, findDeep, moreInfo, numberOf, toHex, type Config, type HomeAssistant } from "../ha";
 import {
-  allProbes, colorOf, doneAtOf, internalSensor, internalValue, isActive, probeNames, rateIcon, rateText, statusOf, trendOf,
-  valueOf, type Probe,
+  allProbes, axisRange, colorOf, doneAtOf, internalSensor, internalValue, isActive, probeNames, rateIcon, rateText, statusOf, trendOf,
+  valueOf, whole, type Probe,
 } from "../sous-chef";
 import { SousChefFeature } from "./base";
 import { numberField } from "./field";
@@ -17,20 +17,29 @@ import { featureStyles } from "./styles";
 const probeEntityIds = (probe: Probe): string[] =>
   [...Object.values(probe.entities), ...probe.channels, ...(probe.internal ? [probe.internal] : [])].filter((id): id is string => !!id);
 
-/** A key for each probe: its color, pressed while it is on; a tap turns it on or off (its Active switch). */
+/**
+ * A key for each probe: its color, pressed while it is on, with its
+ * temperature (or its icon); a tap turns it on or off (its Active switch).
+ */
 export class SousChefProbes extends SousChefFeature {
   static override tag = FEATURES.probes;
   static override pickerName = "Sous Chef probes";
   static override forKind = "grill" as const;
+  static override options = [{
+    name: "show", label: "Show on a probe that is on", default: "temperatures",
+    selector: { select: { mode: "dropdown", options: [{ value: "temperatures", label: "Its temperature" }, { value: "icons", label: "The probe icon" }] } },
+  }];
 
   static override styles = [featureStyles, css`
     .row { justify-content: flex-end; }
-    .key { flex: 0 0 36px; min-width: 36px; padding: 0; border-radius: var(--feature-border-radius, 18px); }
+    .key { flex: 0 0 auto; min-width: 36px; padding: 0 8px; border-radius: var(--feature-border-radius, 18px); font-size: var(--ha-font-size-m, 14px); }
+    .key.icon { padding: 0; flex-basis: 36px; }
     .key[aria-pressed="false"] ha-icon { color: var(--c); }
   `];
 
   protected override watched(): string[] {
-    return this._hass ? allProbes(this._hass).flatMap((p) => [p.entities.active, p.entities.progress].filter((id): id is string => !!id)) : [];
+    const hass = this._hass;
+    return hass ? allProbes(hass).flatMap((p) => [p.entities.active, p.entities.progress, internalSensor(hass, p)].filter((id): id is string => !!id)) : [];
   }
 
   protected override render(): TemplateResult | typeof nothing {
@@ -39,15 +48,17 @@ export class SousChefProbes extends SousChefFeature {
     this.showNothing(!probes.length);
     if (!probes.length) return nothing;
     const names = probeNames(probes);
+    const temperatures = this.option<string>("show") !== "icons";
     return html`<div class="row tight" role="group" aria-label="Probes">
       ${probes.map((p) => {
         const on = isActive(hass, p);
-        const title = `${names.get(p.device)}: ${on ? "on" : "off. Take it off its charger, or tap to turn it on"}`;
-        return html`<button type="button" class="key" aria-pressed=${on ? "true" : "false"} title=${title} aria-label=${title}
+        const t = on && temperatures && statusOf(hass, p) !== "no_reading" ? internalValue(hass, p) : undefined;
+        const title = `${names.get(p.device)}: ${on ? `on${t !== undefined ? `, ${whole(t)}°` : ""}` : "off. Take it off its charger, or tap to turn it on"}`;
+        return html`<button type="button" class="key ${t === undefined ? "icon" : ""}" aria-pressed=${on ? "true" : "false"} title=${title} aria-label=${title}
           style=${styleMap({ "--c": colorOf(p), "--sc-on-color": p.colors[0] === "yellow" || p.colors[0] === "white" ? "rgba(0,0,0,.85)" : "#fff" })}
           ?disabled=${hass.states[p.entities.active!]?.state === "unavailable"}
           @click=${() => this.call("switch", on ? "turn_off" : "turn_on", { entity_id: p.entities.active })}>
-          <ha-icon icon="mdi:thermometer-probe"></ha-icon>
+          ${t === undefined ? html`<ha-icon icon="mdi:thermometer-probe"></ha-icon>` : html`<span class="num">${whole(t)}°</span>`}
         </button>`;
       })}
     </div>`;
@@ -63,6 +74,7 @@ export class SousChefAmbient extends SousChefFeature {
   static override tag = FEATURES.ambient;
   static override pickerName = "Sous Chef ambient";
   static override forKind = "grill" as const;
+  static override controls: [string, string][] = [["trend", "Trend"], ["low", "Low alarm"], ["high", "High alarm"]];
 
   private _samples: [number, number][] = [];
   private _loaded?: string;
@@ -108,8 +120,8 @@ export class SousChefAmbient extends SousChefFeature {
 
   protected override render(): TemplateResult | typeof nothing {
     const hass = this._hass!, ambient = this.ambient;
-    this.showNothing(!ambient);
-    if (!ambient) return nothing;
+    this.showNothing(!ambient || !this.chosen().length);
+    if (!ambient || !this.chosen().length) return nothing;
     if (this._loaded !== ambient.sensor) {
       this._samples = [];
       this._load(ambient.sensor);
@@ -120,21 +132,22 @@ export class SousChefAmbient extends SousChefFeature {
     const alarm = hass.states[ambient.alarm]?.state === "on";
     const low = valueOf(hass, ambient.low), high = valueOf(hass, ambient.high);
     const title = `Grill trend: ${rate === undefined ? "unknown" : rateText(rate)}`;
-    return html`<div class="row" style=${styleMap({ "--c": cssColor(GRILL_COLOR) })}>
-      <button type="button" class="key" title=${title} aria-label=${title} @click=${() => moreInfo(this, ambient.sensor)}>
+    const controls: Record<string, () => unknown> = {
+      trend: () => html`<button type="button" class="key" title=${title} aria-label=${title} @click=${() => moreInfo(this, ambient.sensor)}>
         <ha-icon .icon=${rateIcon(rate, 0.5)}></ha-icon>${rate === undefined ? html`<span class="note">Trend</span>` : html`<span class="num">${rateText(rate)}</span>`}
-      </button>
-      ${numberField(hass, ambient.low, {
+      </button>`,
+      low: () => numberField(hass, ambient.low, {
         icon: "mdi:thermometer-chevron-down", placeholder: "Off", empty: 0,
         title: "Low alarm: Sous Chef alerts when the grill falls below it",
         alarm: alarm && value !== undefined && !!low && value < low,
-      })}
-      ${numberField(hass, ambient.high, {
+      }),
+      high: () => numberField(hass, ambient.high, {
         icon: "mdi:thermometer-chevron-up", placeholder: "Off", empty: 0,
         title: "High alarm: Sous Chef alerts when the grill rises above it",
         alarm: alarm && value !== undefined && !!high && value > high,
-      })}
-    </div>`;
+      }),
+    };
+    return html`<div class="row" style=${styleMap({ "--c": cssColor(GRILL_COLOR) })}>${this.chosen().map((id) => controls[id]())}</div>`;
   }
 }
 
@@ -170,6 +183,10 @@ export class SousChefHistory extends SousChefFeature {
   static override tag = FEATURES.history;
   static override pickerName = "Sous Chef history";
   static override forKind = "grill" as const;
+  static override options = [
+    { name: "hours_to_show", label: "Hours to show", default: HOURS, selector: { number: { min: 1, max: 48, mode: "box", unit_of_measurement: "h" } } },
+    { name: "projections", label: "Projections key", helper: "A key that shows the hour ahead beside the history", default: true, selector: { boolean: {} } },
+  ];
 
   static override styles = [featureStyles, css`
     .box {
@@ -199,6 +216,7 @@ export class SousChefHistory extends SousChefFeature {
   private _ahead: Projection[] = [];
   private _scale?: { top: number; bottom: number; min: number; max: number };
   private _warned = false;
+  private _paletteKey?: string;
 
   protected override watched(): string[] {
     const hass = this._hass, ambient = this.ambient;
@@ -252,7 +270,11 @@ export class SousChefHistory extends SousChefFeature {
         entities.push({ entity: p.entities.target, name: `${names.get(p.device)} target`, color: dim(color, dark) });
       }
     }
-    return { type: "history-graph", entities, hours_to_show: HOURS, expand_legend: true, grid_options: { rows: 4 } };
+    const config: Config = { type: "history-graph", entities, hours_to_show: this.option<number>("hours_to_show"), expand_legend: true, grid_options: { rows: 4 } };
+    // Whole tens around the readings, so the axis has no decimals; the graph still fits its history
+    const range = axisRange(entities.map((e) => valueOf(hass, e.entity)).filter((v): v is number => v !== undefined));
+    if (range) Object.assign(config, { min_y_axis: range[0], max_y_axis: range[1], fit_y_data: true });
+    return config;
   }
 
   /** The projections: the grill level, each probe toward its target at its Done at time (or at its rate). */
@@ -281,10 +303,38 @@ export class SousChefHistory extends SousChefFeature {
     return out;
   }
 
+  /**
+   * The graph's colors on a style: its text, grid lines and tooltip in the
+   * finish's colors (the card sets them). The graph reads the theme's colors
+   * when it is made, so it is made again when they change.
+   */
+  private _palette(): Record<string, string> {
+    const cs = getComputedStyle(this);
+    const get = (name: string) => cs.getPropertyValue(name).trim();
+    const text = get("--sc-screen-text");
+    if (!text) return {};
+    return {
+      color: text, "--primary-text-color": text, "--secondary-text-color": get("--sc-screen-secondary"),
+      "--divider-color": get("--sc-screen-grid"), "--card-background-color": get("--sc-screen-solid"),
+    };
+  }
+
   protected override render(): TemplateResult | typeof nothing {
     const config = this._graphConfig();
     this.showNothing(!config);
     if (!config) return nothing;
+    const palette = this._palette();
+    const projections = this.option<boolean>("projections") !== false;
+    if (!projections) this._projected = false;
+    const paletteKey = JSON.stringify(palette);
+    if (paletteKey !== this._paletteKey) {
+      if (this._graph) {
+        this._graph = undefined;
+        this._loading = false;
+        this._shown = undefined;
+      }
+      this._paletteKey = paletteKey;
+    }
     const key = JSON.stringify(config);
     if (key !== this._shown) {
       this._shown = key;
@@ -302,7 +352,7 @@ export class SousChefHistory extends SousChefFeature {
     this._ahead = this._projected ? this._projections() : [];
     const s = this._scale;
     const y = (v: number) => (s && s.max > s.min ? s.top + ((s.max - v) / (s.max - s.min)) * (s.bottom - s.top) : -100);
-    return html`<div class="box ${this._projected ? "projected" : ""}">
+    return html`<div class="box ${this._projected ? "projected" : ""}" style=${styleMap(palette)}>
       <div class="graph">${this._graph ?? nothing}</div>
       <div class="ahead" aria-hidden="true">
         <svg>
@@ -310,12 +360,12 @@ export class SousChefHistory extends SousChefFeature {
           ${s ? this._ahead.map((p) => svg`<line x1="0" y1=${y(p.from)} x2=${`${p.at * 100}%`} y2=${y(p.to)} stroke=${p.color}
             stroke-width="2" stroke-dasharray="5 4" stroke-linecap="round"></line>`) : nothing}
         </svg>
-        ${s ? html`<span class="label" style=${styleMap({ top: `${s.bottom + 6}px` })}>+${HOURS} h</span>` : nothing}
+        ${s ? html`<span class="label" style=${styleMap({ top: `${s.bottom + 6}px` })}>+1 h</span>` : nothing}
       </div>
-      <button type="button" class="key project" aria-pressed=${this._projected ? "true" : "false"} title="Projected temperatures"
+      ${projections ? html`<button type="button" class="key project" aria-pressed=${this._projected ? "true" : "false"} title="Projected temperatures"
         aria-label="Projected temperatures" style=${styleMap({ "--c": cssColor(GRILL_COLOR) })} @click=${this._toggle}>
         <ha-icon icon="mdi:chart-timeline-variant"></ha-icon>
-      </button>
+      </button>` : nothing}
     </div>`;
   }
 

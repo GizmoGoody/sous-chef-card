@@ -48,8 +48,10 @@ export function tileConfig(config: Config): Config {
 export const TOGGLE_ACTION = { action: "fire-dom-event", sous_chef_card: "toggle" };
 
 /** The grill's tile card: its options, its icon a brand's mark when chosen, and a tap that shows or hides the probes. */
-export function grillConfig(config: Config): Config {
+export function grillConfig(config: Config, open = true): Config {
   const tile = tileConfig(config);
+  // Closed: only the title row (with the feature beside the title), as the Prusa Connect card
+  if (!open) tile.features = tile.features_position === "inline" ? (config.features ?? []).slice(0, 1) : [];
   delete tile.show_entity_picture;
   if (optionOf(config, "grill_icon") !== "grill") tile.show_entity_picture = true;
   if (optionOf(config, "probes_toggle") !== false) tile.tap_action = TOGGLE_ACTION;

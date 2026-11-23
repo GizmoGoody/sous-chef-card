@@ -11,12 +11,13 @@
 // - custom:sous-chef-channels  each channel from the tip, against the reference
 // - custom:sous-chef-timing    the rate, and the time left or the rest
 import { printBadge } from "@gizmogoody/card-badge";
-import { CARD_TYPE, EDITOR_TYPE, TILE_TYPE, VERSION } from "./const";
+import { CARD_TYPE, EDITOR_TYPE, FEATURE_EDITOR_TYPE, TILE_TYPE, VERSION } from "./const";
 import { define, type FeatureContext, type HomeAssistant } from "./ha";
 import { SousChefCard } from "./card/card";
 import { SousChefTile } from "./card/tile";
 import { CHART_DIALOG, SousChefChartDialog } from "./chart/dialog";
 import { SousChefCardEditor } from "./editor/card-editor";
+import { SousChefFeatureEditor } from "./editor/feature-editor";
 import { SousChefAmbient, SousChefHistory, SousChefProbes } from "./features/grill";
 import { SousChefChannels, SousChefCook, SousChefProgress, SousChefTiming } from "./features/probe";
 
@@ -24,7 +25,11 @@ import { SousChefChannels, SousChefCook, SousChefProgress, SousChefTiming } from
 const FEATURES = [SousChefProbes, SousChefHistory, SousChefAmbient, SousChefProgress, SousChefCook, SousChefChannels, SousChefTiming];
 
 if (!customElements.get(CARD_TYPE)) {
-  for (const feature of FEATURES) define(feature.tag, feature);
+  for (const feature of FEATURES) {
+    define(feature.tag, feature);
+    SousChefFeatureEditor.features.set(feature.tag, feature);
+  }
+  define(FEATURE_EDITOR_TYPE, SousChefFeatureEditor);
   define(TILE_TYPE, SousChefTile);
   define(CARD_TYPE, SousChefCard);
   define(EDITOR_TYPE, SousChefCardEditor);
@@ -35,7 +40,7 @@ if (!customElements.get(CARD_TYPE)) {
     type: feature.tag,
     name: feature.pickerName,
     isSupported: (hass?: HomeAssistant, context?: FeatureContext) => feature.supports(hass, context),
-    configurable: false,
+    configurable: feature.configurable,
   })));
 
   window.customCards = window.customCards || [];

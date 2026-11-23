@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { featureForm } from "../../src/features/form";
 import { checkConfig, grillConfig, minimal, probeConfig, stubConfig, tileConfig } from "../../src/card/options";
 import type { HomeAssistant } from "../../src/ha";
 import {
-  allProbes, ambients, channelReadings, durationText, grillBadge, grillLine, internalSensor, probeDevices, probeLine, probeOf,
+  allProbes, ambients, axisRange, channelReadings, durationText, grillBadge, grillLine, internalSensor, probeDevices, probeLine, probeOf,
   rateText, shortNames, statusOf, statusText, trendOf,
 } from "../../src/sous-chef";
 
@@ -202,5 +203,32 @@ describe("the card's options", () => {
     expect(stub.entity).toBe("sensor.grill_ambient");
     expect(stub.features_position).toBe("inline");
     expect(stub.features[0].type).toBe("custom:sous-chef-probes");
+  });
+});
+
+describe("the history's axis", () => {
+  it("is whole tens around the readings, at least 20 degrees", () => {
+    expect(axisRange([60.05, 60.45])).toEqual([50, 70]);
+    expect(axisRange([68, 225, 140])).toEqual([60, 230]);
+    expect(axisRange([])).toBeUndefined();
+  });
+});
+
+describe("the feature editors", () => {
+  it("offer the controls in order, all by default, and the configuration's choice", () => {
+    const form = featureForm([["trend", "Trend"], ["low", "Low alarm"], ["high", "High alarm"]], []);
+    expect(form.schema[0].selector.select.reorder).toBe(true);
+    expect(form.data({ type: "custom:sous-chef-ambient" }).controls).toEqual(["trend", "low", "high"]);
+    expect(form.data({ type: "custom:sous-chef-ambient", controls: ["high", "nope"] }).controls).toEqual(["high"]);
+  });
+});
+
+describe("the collapsed grill", () => {
+  it("keeps only the feature beside the title", () => {
+    const config = { type: "custom:sous-chef-card", entity: "sensor.grill_ambient", features_position: "inline",
+      features: [{ type: "custom:sous-chef-probes" }, { type: "custom:sous-chef-history" }] };
+    expect(grillConfig(config, false).features).toEqual([{ type: "custom:sous-chef-probes" }]);
+    expect(grillConfig({ ...config, features_position: "bottom" }, false).features).toEqual([]);
+    expect(grillConfig(config).features).toHaveLength(2);
   });
 });

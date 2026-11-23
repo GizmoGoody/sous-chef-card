@@ -2,7 +2,7 @@
 
 Sous Chef on a Home Assistant dashboard: for the grill, the smoker and the kitchen.
 
-One card for the grill and every probe. The grill is Home Assistant's own tile card, so everything a tile card does works the same way: name, color, state content, actions and features. Below it, each probe that is on gets a tile of its own. A tap on the grill shows or hides the probes. It needs the [Sous Chef](https://github.com/GizmoGoody/sous-chef) integration.
+One card for the grill and every probe. The grill is Home Assistant's own tile card, so everything a tile card does works the same way: name, color, state content, actions and features. Below it, each probe that is on gets a tile of its own. A tap on the grill folds the card to its title row, and opens it again. It needs the [Sous Chef](https://github.com/GizmoGoody/sous-chef) integration.
 
 ## Installation
 
@@ -17,9 +17,9 @@ Add the **Sous Chef** card to a dashboard. In its editor:
 - The tile card's own editor, for the grill: pick a grill (a Sous Chef ambient sensor), then Content, Interactions and Features.
 - **Sous Chef**:
   - **Style**: a grill's finish behind the whole card. Stainless steel (Bull, Napoleon, Lynx, Blaze, Recteq), Black porcelain (Weber kettles, Traeger Ironwood and Timberline), Bronze (Traeger Pro), Green ceramic (Big Green Egg), Red ceramic (Kamado Joe), or None (your theme).
-  - **Icon**: the grill icon, or the mark of Bull, Weber, Traeger, Big Green Egg or Kamado Joe.
+  - **Icon**: Grill, or Bull, Weber, Traeger, Big Green Egg or Kamado Joe: the brand's small mark, without its name. Big Green Egg has no mark without its name, so it is a green egg.
   - **Features style** (with a style): Match (the controls sit on the finish), Flat (on a plain patch of it) or Console (keys that press in).
-  - **Tap the card to show or hide the probes**: on by default. This browser remembers whether the probes are shown.
+  - **Tap the card to show or hide the probes**: on by default. Folded, the card keeps only its title row (with the feature beside the title). This browser remembers which.
   - **Manage Sous Chef**: opens the Sous Chef page, where probes, ambient sensors and foods are added.
 
 ### The grill
@@ -34,18 +34,18 @@ A probe appears once it is on: taken off its charger, its key tapped, or its Act
 
 On the grill:
 
-- **Sous Chef probes**: a key for each probe beside the grill's name, pressed while it is on. Tap one to turn the probe on or off.
-- **Sous Chef history**: Home Assistant's history graph of the last hour: the grill in orange, each probe that is on in its color, and its target the same color dimmed. The key at the top right shows projected temperatures for the hour ahead.
-- **Sous Chef ambient**: the grill's trend in degrees a minute, and its low and high alarms. Type a limit in place; empty is off.
+- **Sous Chef probes**: a key for each probe beside the grill's name, pressed while it is on, with its temperature. Tap one to turn the probe on or off. Options: show the temperature or the probe icon.
+- **Sous Chef history**: Home Assistant's history graph of the last hour: the grill in orange, each probe that is on in its color, and its target the same color dimmed. The key at the top right shows projected temperatures for the hour ahead. The axis is in whole degrees, and on a style the graph takes the finish's colors. Options: hours to show, and the projections key.
+- **Sous Chef ambient**: the grill's trend in degrees a minute, and its low and high alarms. Type a limit in place; empty is off. Options: which controls, in which order.
 
 On each probe:
 
 - **Sous Chef progress**: the cook's bar in the probe's color, internal → target.
-- **Sous Chef cook**: the food type, the target (typed in with Custom, or the doneness's temperature; tap to choose another level), and the chart: every food, doneness and temperature of a source, with each food's safe minimum. Choose a row to set the probe's Source, Food type and Doneness.
-- **Sous Chef channels**: one key for each channel from the tip (pointed), tinted by its heat, with its difference from the reference (the lowest, REF).
-- **Sous Chef timing**: the rate, and the time left; once done, the rest the chart asks for.
+- **Sous Chef cook**: the food type, the target (typed in with Custom, or the doneness's temperature; tap to choose another level), and the chart: every food, doneness and temperature of a source, with each food's safe minimum. Choose a row to set the probe's Source, Food type and Doneness. Options: which controls, in which order.
+- **Sous Chef channels**: one key for each channel from the tip (pointed), tinted by its heat, with its difference from the reference (the lowest, REF). Options: the differences on or off.
+- **Sous Chef timing**: the rate, and the time left; once done, the rest the chart asks for. Options: which controls, in which order.
 
-The features also work in any tile card for a Sous Chef ambient sensor or probe.
+Each feature's options are in its editor (the pencil beside it in Features). The features also work in any tile card for a Sous Chef ambient sensor or probe.
 
 ### YAML
 

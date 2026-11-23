@@ -340,3 +340,16 @@ export function grillBadge(hass: HomeAssistant, ambient: Ambient | undefined, pr
   const statuses = probes.filter((p) => isActive(hass, p)).map((p) => statusOf(hass, p));
   return (["alarm", "done", "stalled"] as const).find((s) => statuses.includes(s));
 }
+
+/**
+ * The history graph's temperature range: whole tens around the readings,
+ * at least 20 degrees, so the axis never shows decimals when the readings
+ * hardly move. Undefined without a reading.
+ */
+export function axisRange(values: number[]): [number, number] | undefined {
+  const known = values.filter((v) => Number.isFinite(v));
+  if (!known.length) return undefined;
+  const lo = Math.floor((Math.min(...known) - 5) / 10) * 10;
+  const hi = Math.max(Math.ceil((Math.max(...known) + 5) / 10) * 10, lo + 20);
+  return [lo, hi];
+}
