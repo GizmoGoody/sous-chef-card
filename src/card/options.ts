@@ -60,7 +60,7 @@ export function grillConfig(config: Config, open = true): Config {
 
 /**
  * A probe's tile card: its food type (whose icon is the food's), in the
- * probe's color, with its doneness and status as the state, and the probe
+ * probe's color, with the food, its doneness and status as the state, and the probe
  * features below, two to a row.
  */
 export function probeConfig(probe: Probe, name: string): Config {
@@ -69,10 +69,10 @@ export function probeConfig(probe: Probe, name: string): Config {
     entity: probe.entities.food_type ?? probe.entities.active,
     name,
     color: tileColorOf(probe),
-    state_content: ["doneness", "status"],
+    state_content: ["state", "doneness", "status"],
     features: PROBE_FEATURES.map((type) => ({ type: `custom:${type}` })),
     features_position: "bottom",
-    tap_action: { action: "more-info" },
+    tap_action: { action: "none" },
     icon_tap_action: { action: "more-info" },
   };
 }

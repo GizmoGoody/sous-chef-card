@@ -122,9 +122,10 @@ export class SousChefCook extends SousChefFeature {
 }
 
 /**
- * One key for each channel, from the tip (its key pointed): the coldest the
- * faintest and the hottest the strongest, each with its difference from the
- * reference (the lowest), which says REF. Nothing for a one-sensor probe.
+ * The probe's channels in one outline shaped like the probe, its tip at the
+ * left: each channel's temperature from the tip, separated by dots, with its
+ * difference from the reference (the lowest) under it when more than a
+ * degree. A tap on one shows its history. Nothing for a one-sensor probe.
  */
 export class SousChefChannels extends SousChefFeature {
   static override tag = FEATURES.channels;
@@ -134,12 +135,21 @@ export class SousChefChannels extends SousChefFeature {
   }];
 
   static override styles = [featureStyles, css`
-    .readout.ch { flex-direction: column; gap: 1px; padding: 0; font-size: 13px; }
-    .readout.tip { border-radius: 0 var(--feature-border-radius, 12px) var(--feature-border-radius, 12px) 0; padding-left: 8px;
-      clip-path: polygon(12px 0, 100% 0, 100% 100%, 12px 100%, 0 50%); }
-    .readout .value { line-height: 14px; min-height: 14px; }
-    .readout .delta { font-size: 10px; font-weight: 400; line-height: 11px; color: var(--secondary-text-color); }
-    .readout .delta.ref { text-transform: uppercase; letter-spacing: .05em; }
+    /* The outline: a sharp tip, then the body with a rounded end */
+    .probe { position: relative; display: flex; align-items: stretch; min-width: 0; height: var(--feature-height, 42px); color: var(--sc-text, var(--primary-text-color)); }
+    .probe .tip { flex: none; width: 34px; height: 100%; overflow: visible; }
+    .probe .tip path { fill: none; stroke: var(--c); stroke-width: 1.5px; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+    .probe .body {
+      flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 2px; padding: 0 8px 0 0;
+      border: 1.5px solid var(--c); border-left: 0; border-radius: 0 var(--feature-border-radius, 12px) var(--feature-border-radius, 12px) 0;
+    }
+    .ch { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; padding: 0 2px; border: 0; margin: 0;
+      background: none; font: inherit; font-size: 13px; font-weight: 500; color: inherit; cursor: pointer; outline: none; }
+    .ch .value { line-height: 14px; min-height: 14px; }
+    .ch .delta { min-height: 11px; font-size: 10px; font-weight: 400; line-height: 11px; color: var(--secondary-text-color); }
+    .sep { align-self: center; line-height: 14px; color: var(--secondary-text-color); }
+    /* With a difference under a number, each dot stays level with the numbers */
+    .body.deltas .sep { margin-bottom: 11px; }
   `];
 
   protected override render(): TemplateResult | typeof nothing {
@@ -151,21 +161,26 @@ export class SousChefChannels extends SousChefFeature {
     const unit = hass.states[probe.channels[0]]?.attributes.unit_of_measurement ?? "°";
     const deltas = this.option<boolean>("deltas") !== false;
     const channels = channelReadings(probe.channels.map((id) => (reading ? valueOf(hass, id) : undefined)), probe.channels);
+    const shown = (d?: number) => d !== undefined && d > 1;
+    const anyDelta = deltas && channels.some((ch) => !ch.reference && shown(ch.delta));
     return html`<div class="row" style=${styleMap({ "--c": colorOf(probe) })}>
-      ${channels.map((ch, i) => {
-        const title = `Channel ${i + 1}${ch.tip ? ", at the tip" : ""}: ${ch.value === undefined ? "unknown"
-          : `${whole(ch.value)} ${unit}${ch.reference ? ", the reference" : `, ${ch.delta} ${unit} above the reference`}`}`;
-        return readout(title, () => moreInfo(this, ch.id), html`
-          <span class="value num">${ch.value === undefined ? "" : whole(ch.value)}</span>
-          ${deltas ? html`<span class="delta ${ch.reference ? "ref" : ""}">${ch.value === undefined || ch.reference || (ch.delta ?? 0) <= 1 ? "" : `+${ch.delta}°`}</span>` : nothing}`,
-          { cls: `ch ${ch.tip ? "tip" : ""}`, min: CHANNEL_MIN, style: { "--tint": (0.14 + 0.5 * ch.heat).toFixed(2) } });
-      })}
+      <div class="probe" data-min=${ITEM_MIN.wide} role="group" aria-label="Channels">
+        <svg class="tip" viewBox="0 0 34 42" preserveAspectRatio="none" aria-hidden="true"><path d="M34.5 0.75 L0.75 21 L34.5 41.25"></path></svg>
+        <div class="body ${anyDelta ? "deltas" : ""}">
+          ${channels.map((ch, i) => {
+            const title = `Channel ${i + 1}${ch.tip ? ", at the tip" : ""}: ${ch.value === undefined ? "unknown"
+              : `${whole(ch.value)} ${unit}${ch.reference ? ", the reference" : `, ${ch.delta} ${unit} above the reference`}`}`;
+            return html`${i ? html`<span class="sep" aria-hidden="true">·</span>` : nothing}<button type="button" class="ch" title=${title} aria-label=${title}
+              @click=${() => moreInfo(this, ch.id)}>
+              <span class="value num">${ch.value === undefined ? "–" : whole(ch.value)}</span>
+              ${anyDelta ? html`<span class="delta">${ch.reference || !shown(ch.delta) ? "" : `+${ch.delta}°`}</span>` : nothing}
+            </button>`;
+          })}
+        </div>
+      </div>
     </div>`;
   }
 }
-
-// A channel's read-out holds a short number over its difference: as narrow as a key, so four fit in half the card
-const CHANNEL_MIN = 36;
 
 /** The rate, and the time left; once done, the rest the chart asks for. */
 export class SousChefTiming extends SousChefFeature {

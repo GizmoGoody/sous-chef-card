@@ -16,7 +16,7 @@ Add the **Sous Chef** card to a dashboard. In its editor:
 
 - The tile card's own editor, for the grill: pick a grill (a Sous Chef ambient sensor), then Content, Interactions and Features.
 - **Sous Chef**:
-  - **Style**: a grill's finish behind the whole card. Stainless steel (brushed: Napoleon, Lynx, Blaze, Recteq), Bull (its warm satin stainless, with a chrome handle on two posts below the title row), Black porcelain (Weber kettles, Traeger Ironwood and Timberline), Traeger bronze (Traeger Pro), Big Green Egg, Kamado Joe, or None (your theme).
+  - **Style**: a grill's finish behind the whole card. Stainless steel (brushed: Napoleon, Lynx, Blaze, Recteq), Bull (its warm satin stainless, with a chrome handle on two standoffs along the grill's bottom edge), Black porcelain (Weber kettles, Traeger Ironwood and Timberline), Traeger bronze (Traeger Pro), Big Green Egg, Kamado Joe, or None (your theme).
   - **Icon**: Grill, or Bull, Weber, Traeger, Big Green Egg or Kamado Joe: the brand's small mark, without its name. Big Green Egg has no mark without its name, so it is a green egg.
   - **Features style** (with a style): Match (the controls sit on the finish), Flat (on a plain patch of it) or Console (keys that press in).
   - **Tap the card to show or hide the probes**: on by default. Folded, the card keeps only its title row (with the feature beside the title). This browser remembers which.
@@ -36,14 +36,14 @@ On the grill:
 
 - **Sous Chef probes**: a key for each probe beside the grill's name, sharing its width, pressed while it is on, with its temperature. Tap one to turn the probe on or off. Options: show the temperature or the probe icon.
 - **Sous Chef history**: Home Assistant's history graph of the last hour: the grill in orange, each probe that is on in its color, and its target the same color dimmed. The key at the top right shows projected temperatures for the hour ahead. The axis is in whole degrees, and on a style the graph takes the finish's colors. Options: the projections key, and Home Assistant's history graph options (hours to show, expand legend, Y axis).
-- **Sous Chef progress**: a thin bar for each probe that is on, side by side (four to a row), filled to its progress in its color, with its temperature and target over it. Options: Values (off: the bars stacked, each across the card).
+- **Sous Chef progress**: a thin bar for each probe that is on, one above another, each across the card, filled to its progress in its color, with its temperature and target before it. Options: Values.
 - **Sous Chef ambient**: the grill's trend in degrees a minute, and its low and high alarms. Type a limit in place, or press and slide on it; empty is off. Options: which controls, in which order.
 
 On each probe:
 
 - **Sous Chef progress**: the cook's bar in the probe's color, internal → target.
 - **Sous Chef cook**: the food type, the target (typed in with Custom, or the doneness's temperature; tap to choose another level), and the chart: every food, doneness and temperature of a source, with each food's safe minimum. Choose a row to set the probe's Source, Food type and Doneness. Options: which controls, in which order.
-- **Sous Chef channels**: one key for each channel from the tip (pointed), tinted by its heat, with its difference from the reference (the lowest); nothing under the reference, or a channel within 1 degree of it. Options: the differences on or off.
+- **Sous Chef channels**: one outline shaped like the probe, its tip at the left, holding each channel's temperature from the tip, separated by dots, with its difference from the reference (the lowest) under it when more than 1 degree. A tap on one shows its history. Options: the differences on or off.
 - **Sous Chef timing**: the rate, and the time left; once done, the rest the chart asks for. Options: which controls, in which order.
 
 Each feature's options are in its editor (the pencil beside it in Features). The features also work in any tile card for a Sous Chef ambient sensor or probe.

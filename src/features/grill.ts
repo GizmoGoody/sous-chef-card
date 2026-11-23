@@ -458,7 +458,6 @@ export class SousChefHistory extends SousChefFeature {
 }
 
 // Probes to a row in the grill's progress; more go on to another row
-const BARS_PER_ROW = 4;
 
 /**
  * A thin bar for each probe that is on, side by side, up to four to a row:
@@ -470,22 +469,20 @@ export class SousChefProgressBars extends SousChefFeature {
   static override pickerName = "Sous Chef progress";
   static override forKind = "grill" as const;
   static override options = [
-    { name: "values", label: "Values", helper: "Each probe's temperature and target over its bar, the bars side by side. Off: the bars stacked, each across the card.", default: true, selector: { boolean: {} } },
+    { name: "values", label: "Values", helper: "Each probe's temperature and target before its bar", default: true, selector: { boolean: {} } },
   ];
 
   static override styles = [featureStyles, css`
-    .bars { display: grid; grid-template-columns: repeat(var(--columns, 1), minmax(0, 1fr)); grid-auto-rows: var(--feature-height, 42px);
-      gap: var(--ha-card-feature-gap, 12px) var(--feature-button-spacing, 12px); }
-    .cell { display: flex; flex-direction: column; justify-content: center; gap: 5px; min-width: 0; padding: 0; border: 0; margin: 0;
+    /* One thin bar above another, each across the card */
+    .bars { display: grid; grid-template-columns: minmax(0, 1fr); row-gap: 6px; align-content: center; min-height: var(--feature-height, 42px); }
+    .cell { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 0; border: 0; margin: 0;
       background: none; font: inherit; color: var(--sc-text, var(--primary-text-color)); cursor: pointer; outline: none; }
-    .bar { position: relative; flex: none; height: 6px; border-radius: 3px; overflow: hidden; }
+    .bar { position: relative; flex: 1; height: 6px; border-radius: 3px; overflow: hidden; }
     .bar::before { content: ""; position: absolute; inset: 0; background: var(--c); opacity: .22; }
     .fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 4px; background: var(--c); transition: width 600ms ease-in-out; }
     .fill.stalled { background: repeating-linear-gradient(135deg, rgba(255,255,255,.4) 0 4px, transparent 4px 8px), var(--c); }
     .goal { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: rgba(0,0,0,.6); }
-    .reading { font-size: var(--ha-font-size-s, 12px); font-weight: 500; text-align: center; }
-    /* Stacked: thin bars one above another, each across the card */
-    .bars.stacked { grid-auto-rows: auto; row-gap: 8px; align-content: center; min-height: var(--feature-height, 42px); }
+    .reading { flex: none; min-width: 72px; font-size: var(--ha-font-size-s, 12px); font-weight: 500; line-height: 16px; text-align: center; white-space: nowrap; }
     :host([sc-console]) .bar { box-shadow: inset 0 1px 2px rgba(0,0,0,.45); }
     @media (prefers-reduced-motion: reduce) { .fill { transition: none; } }
   `];
@@ -502,8 +499,7 @@ export class SousChefProgressBars extends SousChefFeature {
     if (!on.length) return nothing;
     const names = probeNames(on);
     const readings = this.option<boolean>("values") !== false;
-    const columns = readings ? Math.ceil(on.length / Math.ceil(on.length / BARS_PER_ROW)) : 1;
-    return html`<div class="bars ${readings ? "" : "stacked"}" style=${styleMap({ "--columns": String(columns) })}>
+    return html`<div class="bars">
       ${on.map((p) => {
         const bar = cookBar(hass, p);
         const title = `${names.get(p.device)}: ${bar.label || "no reading"}`;

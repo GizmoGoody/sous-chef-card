@@ -38,22 +38,23 @@ export const cardStyles = css`
   /* Flat and Console: each control on a plain patch of the finish */
   .solid { --sc-backing: var(--sc-base); }
   .probes { display: grid; }
-  /* Bull's handle, under the grill (below its title row when folded): a thick polished chrome tube, its ends
-     bent back to the hood on two standoffs, casting its shadow on the stainless */
-  .handle { position: relative; height: 26px; margin: -2px 10% 10px; pointer-events: none; }
+  /* Bull's handle along the bottom edge of the grill (its title row when folded), taking no room: a polished
+     chrome tube, its ends bent back to the hood on two standoffs, casting its shadow on the stainless */
+  .handle { position: relative; height: 0; pointer-events: none; }
+  .handle > span { position: absolute; }
   .handle .post {
-    position: absolute; top: 4px; width: 20px; height: 21px; border-radius: 3px 3px 9px 9px;
+    bottom: 1px; width: 12px; height: 8px; border-radius: 2px 2px 5px 5px;
     background: linear-gradient(90deg, #6d747a 0%, #c9ced2 30%, #f3f5f6 50%, #b3b9be 72%, #5f666c 100%);
-    box-shadow: 0 4px 5px rgba(0,0,0,.35);
+    box-shadow: 0 2px 3px rgba(0,0,0,.35);
   }
-  .handle .post:first-child { left: 6%; }
-  .handle .post + .post { left: auto; right: 6%; }
+  .handle .post:first-child { left: calc(10% + 18px); }
+  .handle .post + .post { right: calc(10% + 18px); }
   .handle .bar {
-    position: absolute; left: 0; right: 0; top: 2px; height: 15px; border-radius: 8px;
+    left: 10%; right: 10%; bottom: 3px; height: 8px; border-radius: 4px;
     background:
-      linear-gradient(90deg, rgba(0,0,0,.28), transparent 4%, transparent 96%, rgba(0,0,0,.28)),
+      linear-gradient(90deg, rgba(0,0,0,.28), transparent 3%, transparent 97%, rgba(0,0,0,.28)),
       linear-gradient(180deg, #4e555b 0%, #a9b0b6 12%, #ffffff 30%, #e3e7ea 42%, #8e959b 62%, #c8cdd1 78%, #f0f2f4 86%, #5b6268 100%);
-    box-shadow: 0 6px 6px -1px rgba(0,0,0,.32), 0 1px 1px rgba(0,0,0,.4);
+    box-shadow: 0 3px 4px -1px rgba(0,0,0,.35), 0 1px 1px rgba(0,0,0,.4);
   }
   .panel:not(.open) .probes { display: none; }
 `;

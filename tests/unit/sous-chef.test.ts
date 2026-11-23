@@ -193,7 +193,8 @@ describe("the card's options", () => {
     const tile = probeConfig(probeOf(kit(), "red")!, "Red");
     expect(tile.entity).toBe("select.red_food_type");
     expect(tile.color).toBe("red");
-    expect(tile.state_content).toEqual(["doneness", "status"]);
+    expect(tile.state_content).toEqual(["state", "doneness", "status"]);
+    expect(tile.tap_action).toEqual({ action: "none" });
     expect(tile.features.map((f: any) => f.type)).toEqual([
       "custom:sous-chef-progress", "custom:sous-chef-cook", "custom:sous-chef-channels", "custom:sous-chef-timing",
     ]);
