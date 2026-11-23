@@ -10,8 +10,10 @@ import {
   allProbes, axisRange, colorOf, cookBar, doneAtOf, internalSensor, internalValue, isActive, probeNames, rateIcon, rateText, statusOf, trendOf,
   valueOf, whole, type Probe,
 } from "../sous-chef";
-import { SousChefFeature } from "./base";
+import { readout, SousChefFeature } from "./base";
+import type { FeatureForm } from "./form";
 import { numberField } from "./field";
+import { ITEM_MIN } from "./rows";
 import { featureStyles } from "./styles";
 
 const probeEntityIds = (probe: Probe): string[] =>
@@ -31,8 +33,7 @@ export class SousChefProbes extends SousChefFeature {
   }];
 
   static override styles = [featureStyles, css`
-    .key { min-width: 0; padding: 0 4px; border-radius: var(--feature-border-radius, 18px); font-size: var(--ha-font-size-m, 14px); }
-    .key[aria-pressed="false"] ha-icon { color: var(--c); }
+    .key { font-size: var(--ha-font-size-m, 14px); }
   `];
 
   protected override watched(): string[] {
@@ -47,12 +48,13 @@ export class SousChefProbes extends SousChefFeature {
     if (!probes.length) return nothing;
     const names = probeNames(probes);
     const temperatures = this.option<string>("show") !== "icons";
-    return html`<div class="row tight" role="group" aria-label="Probes">
+    // The row wraps rather than leaving a probe out
+    return html`<div class="row wraps" role="group" aria-label="Probes">
       ${probes.map((p) => {
         const on = isActive(hass, p);
         const t = on && temperatures && statusOf(hass, p) !== "no_reading" ? internalValue(hass, p) : undefined;
         const title = `${names.get(p.device)}: ${on ? `on${t !== undefined ? `, ${whole(t)}°` : ""}` : "off. Take it off its charger, or tap to turn it on"}`;
-        return html`<button type="button" class="key ${t === undefined ? "icon" : ""}" aria-pressed=${on ? "true" : "false"} title=${title} aria-label=${title}
+        return html`<button type="button" class="key" data-min=${ITEM_MIN.key} aria-pressed=${on ? "true" : "false"} title=${title} aria-label=${title}
           style=${styleMap({ "--c": colorOf(p), "--sc-on-color": p.colors[0] === "yellow" || p.colors[0] === "white" ? "rgba(0,0,0,.85)" : "#fff" })}
           ?disabled=${hass.states[p.entities.active!]?.state === "unavailable"}
           @click=${() => this.call("switch", on ? "turn_off" : "turn_on", { entity_id: p.entities.active })}>
@@ -131,9 +133,8 @@ export class SousChefAmbient extends SousChefFeature {
     const low = valueOf(hass, ambient.low), high = valueOf(hass, ambient.high);
     const title = `Grill trend: ${rate === undefined ? "unknown" : rateText(rate)}`;
     const controls: Record<string, () => unknown> = {
-      trend: () => html`<button type="button" class="key" title=${title} aria-label=${title} @click=${() => moreInfo(this, ambient.sensor)}>
-        <ha-icon .icon=${rateIcon(rate, 0.5)}></ha-icon>${rate === undefined ? html`<span class="note">Trend</span>` : html`<span class="num">${rateText(rate)}</span>`}
-      </button>`,
+      trend: () => readout(title, () => moreInfo(this, ambient.sensor),
+        html`<ha-icon .icon=${rateIcon(rate, 0.5)}></ha-icon>${rate === undefined ? html`<span class="note">Trend</span>` : html`<span>${rateText(rate)}</span>`}`),
       low: () => numberField(hass, ambient.low, {
         icon: "mdi:thermometer-chevron-down", placeholder: "Off", empty: 0,
         title: "Low alarm: Sous Chef alerts when the grill falls below it",
@@ -182,9 +183,40 @@ export class SousChefHistory extends SousChefFeature {
   static override pickerName = "Sous Chef history";
   static override forKind = "grill" as const;
   static override options = [
-    { name: "hours_to_show", label: "Hours to show", default: HOURS, selector: { number: { min: 1, max: 48, mode: "box", unit_of_measurement: "h" } } },
     { name: "projections", label: "Projections key", helper: "A key that shows the hour ahead beside the history", default: true, selector: { boolean: {} } },
   ];
+
+  /** The editor: the projections key, then Home Assistant's history graph options as its own editor has them (as the Prusa Connect card's history). */
+  static override editor(): FeatureForm {
+    const base = super.editor();
+    return {
+      schema: [
+        ...base.schema,
+        {
+          name: "", type: "grid", schema: [
+            { name: "hours_to_show", label: "Hours to show", selector: { number: { min: 0, step: "any", mode: "box" } } },
+            { name: "expand_legend", label: "Expand legend", selector: { boolean: {} } },
+          ],
+        },
+        {
+          name: "", type: "grid", schema: [
+            { name: "min_y_axis", label: "Minimum Y axis", selector: { number: { mode: "box", step: "any" } } },
+            { name: "max_y_axis", label: "Maximum Y axis", selector: { number: { mode: "box", step: "any" } } },
+          ],
+        },
+        {
+          name: "fit_y_data", label: "Fit Y axis to the data", selector: { boolean: {} },
+          visible: { condition: "or", conditions: [{ field: "min_y_axis", operator: "exists" }, { field: "max_y_axis", operator: "exists" }] },
+        },
+      ],
+      // Numbers left empty stay empty, as in Home Assistant's own editor; the legend is expanded unless turned off
+      data: (c) => ({
+        ...base.data(c),
+        hours_to_show: c.hours_to_show, min_y_axis: c.min_y_axis, max_y_axis: c.max_y_axis,
+        expand_legend: c.expand_legend !== false, fit_y_data: c.fit_y_data === true,
+      }),
+    };
+  }
 
   static override styles = [featureStyles, css`
     .box {
@@ -267,10 +299,21 @@ export class SousChefHistory extends SousChefFeature {
         entities.push({ entity: p.entities.target, name: `${names.get(p.device)} target`, color });
       }
     }
-    const config: Config = { type: "history-graph", entities, hours_to_show: this.option<number>("hours_to_show"), expand_legend: true, grid_options: { rows: 4 } };
-    // Whole tens around the readings, so the axis has no decimals; the graph still fits its history
-    const range = axisRange(entities.map((e) => valueOf(hass, e.entity)).filter((v): v is number => v !== undefined));
-    if (range) Object.assign(config, { min_y_axis: range[0], max_y_axis: range[1], fit_y_data: true });
+    const c = this._config!;
+    const config: Config = {
+      type: "history-graph", entities, hours_to_show: Number(c.hours_to_show) > 0 ? Number(c.hours_to_show) : HOURS,
+      expand_legend: c.expand_legend !== false, grid_options: { rows: 4 },
+    };
+    if (Number.isFinite(c.min_y_axis) || Number.isFinite(c.max_y_axis)) {
+      // The axis as set in the editor, as Home Assistant's own graph takes it
+      if (Number.isFinite(c.min_y_axis)) config.min_y_axis = c.min_y_axis;
+      if (Number.isFinite(c.max_y_axis)) config.max_y_axis = c.max_y_axis;
+      if (c.fit_y_data === true) config.fit_y_data = true;
+    } else {
+      // Otherwise on a round step around the readings, so the axis has no decimals; the graph still fits its history
+      const range = axisRange(entities.map((e) => valueOf(hass, e.entity)).filter((v): v is number => v !== undefined));
+      if (range) Object.assign(config, { min_y_axis: range[0], max_y_axis: range[1], fit_y_data: true });
+    }
     return config;
   }
 
@@ -367,6 +410,7 @@ export class SousChefHistory extends SousChefFeature {
   }
 
   protected override updated(): void {
+    super.updated();
     if (this._projected) requestAnimationFrame(() => this._drawAhead());
   }
 

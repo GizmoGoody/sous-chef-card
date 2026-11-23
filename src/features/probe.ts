@@ -12,7 +12,8 @@ import {
   channelReadings, colorOf, cookBar, CUSTOM, doneAtOf, durationText, internalSensor, rateIcon, rateText,
   statusOf, valueOf, whole,
 } from "../sous-chef";
-import { SousChefFeature } from "./base";
+import { readout, SousChefFeature } from "./base";
+import { ITEM_MIN } from "./rows";
 import { numberField } from "./field";
 import { featureStyles } from "./styles";
 
@@ -72,9 +73,7 @@ export class SousChefCook extends SousChefFeature {
   static override controls: [string, string][] = [["food", "Food type"], ["target", "Target or doneness"], ["chart", "Chart view"]];
 
   static override styles = [featureStyles, css`
-    .food { flex: 0 0 60px; }
-    .chart { flex: 0 0 42px; }
-    .preset { cursor: pointer; font-size: var(--ha-font-size-m, 14px); }
+    .menu { font-size: var(--ha-font-size-m, 14px); }
   `];
 
   private _choose(entityId: string | undefined, option: string): void {
@@ -102,18 +101,18 @@ export class SousChefCook extends SousChefFeature {
     const level = doneness ? hass.formatEntityState(doneness) : "";
     const chosen = this.chosen();
     const controls: Record<string, () => unknown> = {
-      food: () => food ? html`<label class="key food" title="Food type: ${foodName}">
+      food: () => food ? html`<label class="key" data-min=${ITEM_MIN.key} title="Food type: ${foodName}">
         <ha-state-icon .hass=${hass} .stateObj=${food}></ha-state-icon><ha-icon class="arrow" icon="mdi:menu-down"></ha-icon>
         ${this._menu(e.food_type, food, "Food type")}
       </label>` : nothing,
       target: () => custom
         ? numberField(hass, e.target, { placeholder: "Target", title: "Target: type it in" })
-        : html`<label class="field preset" title="Doneness: ${level}${target !== undefined ? `, ${whole(target)}°` : ""}">
+        : html`<label class="field menu" data-min=${ITEM_MIN.field} title="Doneness: ${level}${target !== undefined ? `, ${whole(target)}°` : ""}">
             ${target !== undefined ? html`<span class="num">${whole(target)}°</span>` : html`<span class="note">Target</span>`}
             <ha-icon class="arrow" icon="mdi:menu-down"></ha-icon>
             ${this._menu(e.doneness, doneness, "Doneness")}
           </label>`,
-      chart: () => html`<button type="button" class="key chart" title="Chart view: pick from a chart" aria-label="Chart view"
+      chart: () => html`<button type="button" class="key" data-min=${ITEM_MIN.key} title="Chart view: pick from a chart" aria-label="Chart view"
         ?disabled=${!e.source || !e.food_type || !e.doneness}
         @click=${() => showChartDialog(this, { name: probe.name, source: e.source, food_type: e.food_type, doneness: e.doneness, target: e.target })}>
         <ha-icon icon="mdi:book-open-variant"></ha-icon>
@@ -136,12 +135,12 @@ export class SousChefChannels extends SousChefFeature {
   }];
 
   static override styles = [featureStyles, css`
-    .key { flex-direction: column; gap: 1px; padding: 0; font-size: 13px; }
-    .key.tip { border-radius: 0 var(--feature-border-radius, 12px) var(--feature-border-radius, 12px) 0; padding-left: 8px;
+    .readout.ch { flex-direction: column; gap: 1px; padding: 0; font-size: 13px; }
+    .readout.tip { border-radius: 0 var(--feature-border-radius, 12px) var(--feature-border-radius, 12px) 0; padding-left: 8px;
       clip-path: polygon(12px 0, 100% 0, 100% 100%, 12px 100%, 0 50%); }
-    .key .value { line-height: 14px; min-height: 14px; }
-    .key .delta { font-size: 10px; font-weight: 400; line-height: 11px; color: var(--secondary-text-color); }
-    .key .delta.ref { text-transform: uppercase; letter-spacing: .05em; }
+    .readout .value { line-height: 14px; min-height: 14px; }
+    .readout .delta { font-size: 10px; font-weight: 400; line-height: 11px; color: var(--secondary-text-color); }
+    .readout .delta.ref { text-transform: uppercase; letter-spacing: .05em; }
   `];
 
   protected override render(): TemplateResult | typeof nothing {
@@ -153,19 +152,22 @@ export class SousChefChannels extends SousChefFeature {
     const unit = hass.states[probe.channels[0]]?.attributes.unit_of_measurement ?? "°";
     const deltas = this.option<boolean>("deltas") !== false;
     const channels = channelReadings(probe.channels.map((id) => (reading ? valueOf(hass, id) : undefined)), probe.channels);
-    return html`<div class="row tight" style=${styleMap({ "--c": colorOf(probe) })}>
+    // The row wraps rather than leaving a channel out
+    return html`<div class="row wraps" style=${styleMap({ "--c": colorOf(probe) })}>
       ${channels.map((ch, i) => {
         const title = `Channel ${i + 1}${ch.tip ? ", at the tip" : ""}: ${ch.value === undefined ? "unknown"
           : `${whole(ch.value)} ${unit}${ch.reference ? ", the reference" : `, ${ch.delta} ${unit} above the reference`}`}`;
-        return html`<button type="button" class="key ${ch.tip ? "tip" : ""}" title=${title} aria-label=${title}
-          style=${styleMap({ "--tint": (0.14 + 0.5 * ch.heat).toFixed(2) })} @click=${() => moreInfo(this, ch.id)}>
+        return readout(title, () => moreInfo(this, ch.id), html`
           <span class="value num">${ch.value === undefined ? "" : whole(ch.value)}</span>
-          ${deltas ? html`<span class="delta ${ch.reference ? "ref" : ""}">${ch.value === undefined ? "" : ch.reference ? "Ref" : `+${ch.delta}°`}</span>` : nothing}
-        </button>`;
+          ${deltas ? html`<span class="delta ${ch.reference ? "ref" : ""}">${ch.value === undefined ? "" : ch.reference ? "Ref" : `+${ch.delta}°`}</span>` : nothing}`,
+          { cls: `ch ${ch.tip ? "tip" : ""}`, min: CHANNEL_MIN, style: { "--tint": (0.14 + 0.5 * ch.heat).toFixed(2) } });
       })}
     </div>`;
   }
 }
+
+// A channel's read-out holds a short number over its difference: narrower than a read-out of words
+const CHANNEL_MIN = 44;
 
 /** The rate, and the time left; once done, the rest the chart asks for. */
 export class SousChefTiming extends SousChefFeature {
@@ -201,12 +203,10 @@ export class SousChefTiming extends SousChefFeature {
     const rateTitle = `Rate: ${rate === undefined ? "unknown" : `${rateText(rate)}`}`;
     const timeTitle = done ? `Rest from the chart${rest > 0 ? `: ${rest} min` : ""}` : `Time left: ${left || "unknown"}`;
     const controls: Record<string, () => unknown> = {
-      rate: () => html`<button type="button" class="key" title=${rateTitle} aria-label=${rateTitle} @click=${() => moreInfo(this, e.rate)}>
-        <ha-icon .icon=${rateIcon(rate, 0.3)}></ha-icon>${rate === undefined ? html`<span class="note">Rate</span>` : html`<span class="num">${rateText(rate)}</span>`}
-      </button>`,
-      time: () => html`<button type="button" class="key" title=${timeTitle} aria-label=${timeTitle} @click=${() => moreInfo(this, done ? e.doneness : e.done_at)}>
-        <ha-icon .icon=${done ? "mdi:timer-sand" : "mdi:timer-outline"}></ha-icon>${left ? html`<span class="num">${left}</span>` : html`<span class="note">${done ? "Done" : "Time left"}</span>`}
-      </button>`,
+      rate: () => readout(rateTitle, () => moreInfo(this, e.rate),
+        html`<ha-icon .icon=${rateIcon(rate, 0.3)}></ha-icon>${rate === undefined ? html`<span class="note">Rate</span>` : html`<span>${rateText(rate)}</span>`}`),
+      time: () => readout(timeTitle, () => moreInfo(this, done ? e.doneness : e.done_at),
+        html`<ha-icon .icon=${done ? "mdi:timer-sand" : "mdi:timer-outline"}></ha-icon>${left ? html`<span>${left}</span>` : html`<span class="note">${done ? "Done" : "Time left"}</span>`}`),
     };
     return html`<div class="row" style=${styleMap({ "--c": colorOf(probe) })}>${this.chosen().map((id) => controls[id]())}</div>`;
   }

@@ -1,11 +1,12 @@
 // What every Sous Chef feature has: Home Assistant, its context (the tile
 // card's entity) and its configuration. A probe's features follow the
 // probe of the card's entity; the grill's follow the ambient sensor.
-import { LitElement, type CSSResultGroup, type PropertyValues } from "lit";
+import { html, LitElement, type CSSResultGroup, type PropertyValues, type TemplateResult } from "lit";
 import { FEATURE_EDITOR_TYPE } from "../const";
 import type { Config, FeatureContext, HomeAssistant } from "../ha";
 import { chosenOf, featureForm, type FeatureForm, type FeatureOption } from "./form";
 import { ambientOf, probeOfEntity, type Ambient, type Probe } from "../sous-chef";
+import { ITEM_MIN, RowFitter } from "./rows";
 import { featureStyles } from "./styles";
 
 export class SousChefFeature extends LitElement {
@@ -49,6 +50,7 @@ export class SousChefFeature extends LitElement {
   protected _config?: Config;
   protected _hass?: HomeAssistant;
   protected _context?: FeatureContext;
+  private _fitter = new RowFitter();
 
   constructor() {
     super();
@@ -118,6 +120,11 @@ export class SousChefFeature extends LitElement {
     return this._hass ? ambientOf(this._hass, this._context?.entity_id) : undefined;
   }
 
+  /** Its rows fitted to their width (see rows.ts): each item at least its minimum, and those that do not fit left out, unless the row wraps. */
+  protected override updated(): void {
+    this._fitter.fit(this.renderRoot.querySelectorAll<HTMLElement>(".row"));
+  }
+
   protected override shouldUpdate(_changed: PropertyValues): boolean {
     return !!(this._hass && this._config && this._context);
   }
@@ -139,3 +146,18 @@ export class SousChefFeature extends LitElement {
   }
 }
 
+/**
+ * A read-out, as the Prusa Connect card draws one: a value only shown (it
+ * does not press in like a key), its icon in its color; a tap or Enter opens it.
+ */
+export function readout(title: string, open: () => void, content: TemplateResult,
+  o: { cls?: string; min?: number; style?: Record<string, string> } = {}): TemplateResult {
+  const style = Object.entries(o.style ?? {}).map(([k, v]) => `${k}: ${v}`).join("; ");
+  return html`<div class="field readout ${o.cls ?? ""}" role="button" tabindex="0" data-min=${o.min ?? ITEM_MIN.readout}
+    title=${title} aria-label=${title} style=${style} @click=${open}
+    @keydown=${(ev: KeyboardEvent) => {
+      if (ev.key !== "Enter" && ev.key !== " ") return;
+      ev.preventDefault();
+      open();
+    }}>${content}</div>`;
+}
