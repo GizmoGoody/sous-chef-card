@@ -342,14 +342,16 @@ export function grillBadge(hass: HomeAssistant, ambient: Ambient | undefined, pr
 }
 
 /**
- * The history graph's temperature range: whole tens around the readings,
- * at least 20 degrees, so the axis never shows decimals when the readings
- * hardly move. Undefined without a reading.
+ * The history graph's temperature range: around the readings, at least 20
+ * degrees, its ends on a round step (5, 10, 20, 25, 50 or 100 degrees, for
+ * about five lines), so the axis never shows decimals when the readings
+ * hardly move, and no odd label at either end. Undefined without a reading.
  */
 export function axisRange(values: number[]): [number, number] | undefined {
   const known = values.filter((v) => Number.isFinite(v));
   if (!known.length) return undefined;
-  const lo = Math.floor((Math.min(...known) - 5) / 10) * 10;
-  const hi = Math.max(Math.ceil((Math.max(...known) + 5) / 10) * 10, lo + 20);
-  return [lo, hi];
+  const min = Math.min(...known) - 5, max = Math.max(...known) + 5;
+  const step = [5, 10, 20, 25, 50, 100].find((s) => s >= (max - min) / 5) ?? 100;
+  const lo = Math.floor(min / step) * step;
+  return [lo, Math.max(Math.ceil(max / step) * step, lo + 20)];
 }

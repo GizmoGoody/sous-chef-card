@@ -53,7 +53,7 @@ export const featureStyles = css`
   .field.alarm ha-icon { color: #fff; }
   .field { font-size: var(--ha-font-size-m, 14px); cursor: text; }
   /* A key with a list: the browser's own list, over the whole key (as the Prusa Connect card's Presets key) */
-  .key select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font: inherit; }
+  .key select, .field select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font: inherit; }
   /* Console: the keys press in */
   :host([sc-console]) .key {
     background-image: linear-gradient(180deg, rgba(255,255,255,.35), rgba(255,255,255,0) 45%, rgba(0,0,0,.18));

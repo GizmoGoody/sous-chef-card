@@ -207,9 +207,10 @@ describe("the card's options", () => {
 });
 
 describe("the history's axis", () => {
-  it("is whole tens around the readings, at least 20 degrees", () => {
-    expect(axisRange([60.05, 60.45])).toEqual([50, 70]);
-    expect(axisRange([68, 225, 140])).toEqual([60, 230]);
+  it("is on a round step around the readings, at least 20 degrees", () => {
+    expect(axisRange([60.05, 60.45])).toEqual([55, 75]);
+    expect(axisRange([60, 68, 72, 145])).toEqual([40, 160]);
+    expect(axisRange([68, 225, 140])).toEqual([50, 250]);
     expect(axisRange([])).toBeUndefined();
   });
 });
